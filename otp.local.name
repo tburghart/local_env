@@ -1,0 +1,46 @@
+#
+# Figure out the local 'name' of the current OTP source or install directory
+#
+# If $otp_name is not already set, then:
+#
+#   If ${ERL_TOP:-$(pwd)} is under $otp_source_base
+#   Or $(pwd) is under $otp_install_base
+#   Then
+#       the result is the starting path with the base removed
+#   Else
+#       the result is the last two directory segments
+#
+#   If the result contains directory separators, they are replaced with dashes
+#
+
+if [[ -z "$otp_name" ]]
+then
+    . "$LOCAL_ENV_DIR/otp.source.base"
+
+    if [[ -n "$ERL_TOP" && -d "$ERL_TOP" ]]
+    then
+        if [[ "$ERL_TOP" == "$otp_source_base"/* ]]
+        then
+            otp_name="${ERL_TOP#${otp_source_base}/}"
+        else
+            otp_name="$(basename "$(dirname "$ERL_TOP")")/${ERL_TOP##*/}"
+        fi
+    else
+        . "$LOCAL_ENV_DIR/otp.install.base"
+
+        [[ -n "$cur_dir" && -d "$cur_dir" ]] || cur_dir="$(pwd)"
+
+        if [[ "$cur_dir" == "$otp_source_base"/* ]]
+        then
+            otp_name="${cur_dir#${otp_source_base}/}"
+
+        elif [[ "$cur_dir" == "$otp_install_base"/* ]]
+        then
+            otp_name="${cur_dir#${otp_install_base}/}"
+
+        else
+            otp_name="$(basename "$(dirname "$cur_dir")")/${cur_dir##*/}"
+        fi
+    fi
+    otp_name="${otp_name//\//-}"
+fi

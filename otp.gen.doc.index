@@ -4,16 +4,16 @@ readonly  sdir="$(cd "$(dirname "$0")" && pwd)"
 readonly  sname="${0##*/}"
 readonly  spath="$sdir/$sname"
 
-. "$sdir/otp.local.path"
+. "$sdir/otp.install.base"
 
 if [[ $# -ne 1 ]]
 then
     echo "Usage: $sname local-otp-release-name (under 'local' install path)" >&2
-    echo "       * local install path is '$otp_local_path'" >&2
+    echo "       * local install path is '$otp_install_base'" >&2
     exit 1
 fi
 
-readonly  inst_path="$otp_local_path/$1" 
+readonly  inst_path="$otp_install_base/$1" 
 
 if [[ ! -d "$inst_path" ]]
 then

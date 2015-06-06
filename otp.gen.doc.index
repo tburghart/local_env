@@ -1,0 +1,136 @@
+#!/bin/ksh -e
+
+readonly  sdir="$(cd "$(dirname "$0")" && pwd)"
+readonly  sname="${0##*/}"
+readonly  spath="$sdir/$sname"
+
+. "$sdir/otp.local.path"
+
+if [[ $# -ne 1 ]]
+then
+    echo "Usage: $sname local-otp-release-name (under 'local' install path)" >&2
+    echo "       * local install path is '$otp_local_path'" >&2
+    exit 1
+fi
+
+readonly  inst_path="$otp_local_path/$1" 
+
+if [[ ! -d "$inst_path" ]]
+then
+    echo "$sname error: '$inst_path' is not a directory" >&2
+    exit 2
+fi
+
+cd "$inst_path"
+
+if ls -1 lib/erlang/releases/*/OTP_VERSION 1>/dev/null 2>&1
+then
+    readonly  pre17='false'
+    readonly  release="$(<"$(ls -1 lib/erlang/releases/*/OTP_VERSION | tail -1)")"
+else
+    if [[ ! -f 'lib/erlang/releases/RELEASES' ]]
+    then
+        echo "$sname error: '$inst_path' doesn't appear to be a proper OTP installation" >&2
+        exit 3
+    fi
+    readonly  pre17='true'
+    readonly  release="$(egrep '^.*release,' 'lib/erlang/releases/RELEASES' \
+        | head -1 | cut -f3 -d, | cut -f2 '-d"')"
+fi
+
+for dir in lib/erlang/erts-* lib/erlang/lib/?*-*
+do
+    # only link to directories
+    [[ -d "$dir" ]] || continue
+    dname="${dir##*/}"
+    label="${dname%%-*}"
+    # make sure we're not linking to ourself!
+    [[ "$dname" != "$label" ]] || continue
+    /bin/ln -sf "$dname" "${dir%/*}/$label"
+done
+
+readonly  index_file="$inst_path/index.html"
+readonly  href_entry='<a href="%s">%s</a>'
+
+typeset -u  utext="$1"
+
+cat <<EOF >"$index_file"
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Strict//EN">
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <title>Erlang/OTP $release Documentation</title>
+    <style type="text/css">
+      body      { margin-top: 0.6in; margin-bottom: 0.6in;
+                  margin-left: 0.8in; margin-right: 0.8in; }
+      hr        { width: 100%; }
+      table     { border: 0; }
+      th        { text-align: left; font-variant: small-caps; }
+      td        { text-align: left; padding-left: 10ex; }
+    </style>
+  </head>
+  <body>
+    <h2>Erlang/OTP $release Documentation</h2>
+    <hr>
+    <h3>General</h3>
+    <p>
+      <a href="lib/erlang/doc/index.html">Main</a>
+    - <a href="lib/erlang/doc/reference_manual/users_guide.html">Reference Manual</a>
+    - <a href="lib/erlang/doc/reference_manual/typespec.html">Type Specifications</a>
+    </p>
+    <hr>
+    <h3>Quick Access</h3>
+    <p>
+      <a href="lib/erlang/erts/doc/html/erlang.html">ERTS</a>
+      - <a href="lib/erlang/lib/sasl/doc/html/index.html">SASL</a>
+    - <a href="lib/erlang/lib/kernel/doc/html/index.html">Kernel</a>
+    - <a href="lib/erlang/lib/stdlib/doc/html/index.html">STDLIB</a>
+    - <a href="lib/erlang/lib/crypto/doc/html/crypto.html">Crypto</a>
+    - <a href="lib/erlang/lib/compiler/doc/html/compile.html">Compiler</a>
+    - <a href="lib/erlang/lib/eunit/doc/html/chapter.html">EUnit</a>
+    - <a href="lib/erlang/lib/dialyzer/doc/html/dialyzer.html">Dialyzer</a>
+    - <a href="lib/erlang/lib/debugger/doc/html/debugger_chapter.html">Debugger</a>
+    </p>
+    <hr>
+    <h3>Package Documentation</h3>
+    <table>
+      <tbody>
+        <tr>
+          <th>Erlang/ERTS</td>
+          <td><a href="lib/erlang/erts/doc/html/erlang.html">API</a></td>
+          <td><a href="lib/erlang/erts/doc/html/release_notes.html">Release Notes</a></td>
+        </tr>
+EOF
+
+for p in lib/erlang/lib/*
+do
+    [[ -L "$p" ]] || continue
+    if [[ -f "$p/doc/html/index.html" ]]
+    then
+        ix_ent="<a href=\"$p/doc/html/index.html\">API</a>"
+    else
+        unset ix_ent
+    fi
+    if [[ -f "$p/doc/html/release_notes.html" ]]
+    then
+        rn_ent="<a href=\"$p/doc/html/release_notes.html\">Release Notes</a>"
+    else
+        unset rn_ent
+    fi
+    [[ -n "$ix_ent" || -n "$rn_ent" ]] || continue
+    cat <<EOF
+        <tr>
+          <th>${p##*/}</td>
+          <td>${ix_ent}</td>
+          <td>${rn_ent}</td>
+        </tr>
+EOF
+done >>"$index_file"
+
+cat <<EOF >>"$index_file"
+      </tbody>
+    </table>
+    <hr>
+  </body>
+</html>
+EOF

@@ -1,0 +1,29 @@
+#
+# lightweight mock kerl activate
+#
+# this assumes bash, other shells may vary
+#
+env_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+[[ -z "$(type -t kerl_deactivate)" ]] || kerl_deactivate
+
+# Set, and use, _KERL_PATH_REMOVABLE as kerl would, because an
+# actual kerl `activate` script will overwrite our kerl_deactivate
+# function rather than calling it first.
+
+export  _KERL_PATH_REMOVABLE="$env_dir/bin"
+unset   env_dir
+export  PATH="$_KERL_PATH_REMOVABLE:${PATH//${_KERL_PATH_REMOVABLE}:/}"
+
+kerl_deactivate()
+{
+    if [[ -n "$_KERL_PATH_REMOVABLE" ]]
+    then
+        export  PATH="${PATH//${_KERL_PATH_REMOVABLE}:/}"
+        unset   _KERL_PATH_REMOVABLE
+        hash    -r
+    fi
+    unset   -f kerl_deactivate
+}
+
+hash -r

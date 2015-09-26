@@ -1,0 +1,617 @@
+#
+# .shrc - shell startup file 
+#
+if [ -z "$PS1" ]
+then
+    return
+fi
+#
+# file permissions: rwxr-xr-x
+#
+umask	022
+#
+# shell specific
+#
+u="${LOGNAME:-${USER:-$(id -un)}}@$(hostname | cut -d. -f1)"
+if [ -n "$KSH_VERSION" ]
+then
+    set -o vi
+    PS1="K \$(date '+%H:%M:%S') $u \$PWD rc:\$?
+"
+    if [[ $(id -u) -eq 0 ]]
+    then
+        PS1="${PS1}# "
+    else
+        PS1="${PS1}\$ "
+    fi
+	alias which='whence'
+    typeof()
+    {
+        if [[ $# -ne 1 ]]
+        then
+            echo 'usage: typeof <name>' >&2
+            return 1
+        fi
+        t="$(whence -v "$1" 2>/dev/null)"
+        case "$t" in
+            *\ tracked\ alias\ * )
+                echo file
+                ;;
+            *\ alias\ * )
+                echo alias
+                ;;
+            *\ builtin )
+                echo builtin
+                ;;
+            *\ function )
+                echo function
+                ;;
+            *\ keyword )
+                echo keyword
+                ;;
+            '' )
+                echo undefined
+                ;;
+            * )
+                echo file
+                ;;
+        esac
+        unset t
+    }
+
+elif [ -n "$ZSH_VERSION" ]
+then
+    set -o append_history
+    set -o hist_ignore_all_dups
+    set -o hist_reduce_blanks
+    set -o hist_save_no_dups
+    set -o inc_append_history
+    set -o vi
+    bindkey -v
+    bindkey -M vicmd 'k' vi-up-line-or-history
+    bindkey -M vicmd 'j' vi-down-line-or-history
+    PS1="Z %D{%H:%M:%S} $u %d rc:%?
+%(!.#.\$) "
+    typeof()
+    {
+        if [[ $# -ne 1 ]]
+        then
+            echo 'usage: typeof <name>' >&2
+            return 1
+        fi
+        t="$(whence -v "$1")"
+        case "$t" in
+            *\ not\ found )
+                echo undefined
+                ;;
+            *\ alias\ * )
+                echo alias
+                ;;
+            *\ builtin )
+                echo builtin
+                ;;
+            *\ function )
+                echo function
+                ;;
+            *\ reserved\ word )
+                echo keyword
+                ;;
+            * )
+                echo file
+                ;;
+        esac
+        unset t
+    }
+
+elif [ -n "$BASH_VERSION" ]
+then
+    set -o vi
+    PS1="B \\t $u \$PWD rc:\$?\\n\\$ "
+    alias whence='type -p'
+    alias which='type -p'
+    typeof()
+    {
+        if [[ $# -ne 1 ]]
+        then
+            echo 'usage: typeof <name>' >&2
+            return 1
+        fi
+        t="$(type -t "$1")"
+        if [[ -z "$t" ]]
+        then
+            echo undefined
+        else
+            echo "$t"
+        fi
+        unset t
+    }
+
+else    # assume some Bourne variant
+    set -o vi
+    PS1="s $u \$PWD rc:\$?
+"
+    if [ $(id -u) -eq 0 ]
+    then
+        PS1="${PS1}# "
+    else
+        PS1="${PS1}\$ "
+    fi
+    typeof()
+    {
+        if [ $# -ne 1 ]
+        then
+            echo 'usage: typeof <name>' >&2
+            return 1
+        fi
+        t="$(type "$1" 2>/dev/null 1| head -1)"
+        case "$t" in
+            '' )
+                echo undefined
+                ;;
+            *\ aliased\ * )
+                echo alias
+                ;;
+            *\ builtin )
+                echo builtin
+                ;;
+            *\ function )
+                echo function
+                ;;
+            *\ reserved\ word )
+                echo keyword
+                ;;
+            * )
+                echo file
+                ;;
+        esac
+        unset t
+    }
+fi
+unset   u
+export  PS1
+
+if [ "$(typeof chdir)" = 'undefined' ]
+then
+    chdir()
+    {
+        command cd "$@"
+    }
+fi
+
+find_here_or_above()
+{
+    if [[ $# -lt 1 ]]
+    then
+        echo 'usage: find_here_or_above <filename> [<highest-dir>]' >&2
+        return 1
+    fi
+    if [[ -n "$2" ]]
+    then
+        if [[ ! -d "$2" ]]
+        then
+            echo "error: find_here_or_above: '$2' is not a directory"
+            return 1
+        fi
+        t="$(cd "$2" && pwd)"
+    else
+        t="$HOME"
+    fi
+    c="$(pwd)"
+    if [[ "$c" != "$t" && "${c#${t}/}" == "$c" ]]
+    then
+        unset c t
+        return 2
+    fi
+    while true
+    do
+        if [[ -f "$c/$1" ]]
+        then
+            echo "$c/$1"
+            unset c t
+            return 0
+        fi
+        if [[ "$c" = "$t" ]]
+        then
+            break
+        fi
+        c="${c%/*}"
+    done
+    unset c t
+    return 2
+}
+
+isvar()
+{
+    if [[ $# -ne 1 ]]
+    then
+        echo 'usage: isvar <name>' >&2
+        return 1
+    fi
+    case "$(eval echo "\$$1")" in
+        \$ | '' )
+            if set | grep -q "^$1="
+            then
+                return 0
+            else
+                return 1
+            fi
+            ;;
+        * )
+            return 0
+            ;;
+    esac
+}
+
+[[ -n "$lenv_file" ]] || readonly lenv_file='env'
+
+lenm()
+{
+    if [[ -n "$lenv_label" ]]
+    then
+        echo $lenv_label
+    elif [[ -n "$lenv_current" ]]
+    then
+        basename "$lenv_current"
+    fi
+}
+
+lenv()
+{
+    lenv_target="$(pwd)"
+    case "$(typeof reset_lenv)" in
+        undefined )
+            if [[ -n "$reset_lenv" ]]
+            then
+                $reset_lenv
+                unset reset_lenv
+            fi
+            ;;
+        file )
+            . reset_lenv
+            ;;
+        alias )
+            reset_lenv
+            unalias reset_lenv 2>/dev/null || true
+            ;;
+        function )
+            reset_lenv
+            unset -f reset_lenv 2>/dev/null || true
+            ;;
+        * )
+            reset_lenv
+            ;;
+    esac
+    if [[ -n "$lenv_aliases" ]]
+    then
+        unalias $lenv_aliases 2>/dev/null
+        unset lenv_aliases
+    fi
+    if [[ -n "$lenv_envvars" ]]
+    then
+        unset $lenv_envvars 2>/dev/null
+        unset lenv_envvars
+    fi
+    if [[ -f "$lenv_target/$lenv_file" ]]
+    then
+        . "$lenv_target/$lenv_file"
+        lenv_current="$lenv_target"
+        if [[ "$(typeof reset_lenv)" == undefined && -z "$reset_lenv" ]]
+        then
+            reset_lenv()
+            {
+                [[ "$(typeof kerl_deactivate)" == 'undefined' ]] || kerl_deactivate
+
+                if [[ -n "$env_reset_unalias" ]]
+                then
+                    unalias $env_reset_unalias 2>/dev/null
+                    unset env_reset_unalias
+                fi
+                if [[ -n "$env_reset_unsetf" ]]
+                then
+                    unset -f $env_reset_unsetf 2>/dev/null
+                    unset env_reset_unsetf
+                fi
+                if [[ -n "$env_reset_unset" ]]
+                then
+                    unset $env_reset_unset 2>/dev/null
+                    unset env_reset_unset
+                fi
+                unset -f reset_lenv
+            }
+        fi
+    else
+        unset lenv_current 2>/dev/null
+    fi
+    unset lenv_target
+}
+
+cdl()
+{
+    chdir "$@" || return $?
+    lenv
+}
+
+newscr()
+{
+    u='usage: newscr interpretter target-file'
+    if [[ $# -ne 2 ]]
+    then
+        echo "$u" >&2
+        unset u
+        return 1
+    fi
+    e=''
+    s="$(/usr/bin/which "$1")"
+    if [[ -z "$s" ]]
+    then
+        e="interpretter '$1' not found"
+    else
+        if [[ -e "$2" ]]
+        then
+            e="'$2' already exists!"
+        else
+            e="$(/usr/bin/touch "$2" 2>&1)"
+            if [[ -z "$e" ]]
+            then
+                case "${s##*/}" in
+                    escript )
+                        printf '#!/usr/bin/env escript\n' > "$2"
+                        printf '%% -*- erlang -*-\n' >> "$2"
+                        printf '%%! -smp enable +K true -sname %s\n' "${2##*/}" >> "$2"
+                        ;;
+                    bash | ksh | sh | zsh )
+                        printf '#!%s -e -x\n\n' "$s" > "$2"
+                        printf 'readonly  sdir="$(cd "$(dirname "$0")" && pwd)"\n' >> "$2"
+                        printf 'readonly  sname="${0##*/}"\n' >> "$2"
+                        printf 'readonly  spath="$sdir/$sname"\n' >> "$2"
+                        ;;
+                    * )
+                        printf '#!%s\n' "$s" > "$2"
+                        ;;
+                esac
+                printf '\n\n' >> "$2"
+                /bin/chmod +x "$2"
+            fi
+        fi
+    fi 
+    if [[ -n "$e" ]]
+    then
+        echo "error: newscr: $e" >&2
+        echo "$u" >&2
+        unset e s u
+        return 1
+    fi
+    unset e s u
+}
+
+giga()
+{
+    d="$(pwd)"
+    if [[ "$d" = "$HOME" ]]
+    then
+        "$MATE" ~/.gitignore_global
+    else
+        if [[ "$d" != "${d#${HOME}/}" ]]
+        then
+            while [[ "$d" != "$HOME" ]]
+            do
+                if [[ -f "$d/.gitignore" ]]
+                then
+                    "$MATE" -m "$(basename "$d") .gitignore" "$d/.gitignore"
+                    unset d
+                    return 0
+                fi
+                d="${d%/*}"
+            done
+            "$MATE" ~/.gitignore_global
+        fi
+    fi
+    unset d
+}
+
+dirpath()
+{
+    if [[ $# -ne 1 ]]
+    then
+        echo 'usage: dirpath <filesystem-path>' >&2
+        return 1
+    fi
+    if [[ -d "$1" ]]
+    then
+        d="$1"
+    else
+        d="$(dirname "$1")"
+    fi
+    case "$d" in
+        '.' )
+            pwd
+            ;;
+        '..' )
+            dirname "$(pwd)"
+            ;;
+        * )
+            (cd "$d" && pwd)
+            ;;
+    esac
+    unset d
+}
+
+m()
+{
+    if [[ $# -eq 0 ]]
+    then
+        "$MATE"
+    else
+        for n in "$@"
+        do
+            "$MATE" -m "$(basename "$(dirpath "$n")") $(basename "$n")" "$n"
+        done
+        unset n
+    fi
+}
+
+# SSH
+alias aws-scp='/usr/bin/scp -p -i /Users/ted/.aws/aws.ssh.1.pem'
+alias aws-ssh='/usr/bin/ssh -R 52698:localhost:52698 -i /Users/ted/.aws/aws.ssh.1.pem'
+alias chimera='/usr/bin/ssh -R 52698:localhost:52698 -l root chimera'
+alias gramma='/usr/bin/ssh -R 52698:localhost:52698 -l root -p 22032 gramma'
+alias tshome='/usr/bin/ssh -R 52698:localhost:52698 -p 22007 tshome'
+
+# Stuff
+alias remake="$MAKE clean && $MAKE"
+alias dircp='/bin/pax -rw -pe -X'
+alias rtconf="m ~/.riak_test.config"
+alias shconf="m ~/.shrc"
+alias shrc=". ~/.shrc"
+alias b="cd $BASHO_PRJ_BASE"
+alias e="$MATE"
+alias ideaerls="m ~/Library/Preferences/IdeaIC14/options/jdk.table.xml"
+alias ideadirs="/usr/bin/find ~/prj -type d -name .idea && echo ~/Library/Preferences/IdeaIC14/options/jdk.table.xml"
+alias t="cd $TRB_PRJ_BASE"
+
+# Dates
+alias utcs="/bin/date '+%s'"
+d2utcs()
+{
+    /bin/date -jf '%a %b %d %T %Z %Y' "$*" '+%s'
+}
+utcs2d()
+{
+    /bin/date -jf '%s' "$*"
+}
+
+# Scripts
+alias newbash='newscr bash'
+alias newes='newscr escript'
+alias newksh='newscr ksh'
+alias newsh='newscr sh'
+alias newzsh='newscr zsh'
+
+# Ruby Path to Enlightenment
+alias rp="cd $HOME/prj/ruby/koans && ruby path_to_enlightenment.rb"
+
+# git
+alias g="$GIT"
+alias ga="$GIT add"
+alias gaa="$GIT add -A"
+alias gb="$GIT branch"
+alias gci="$GIT commit"
+alias gcl="$GIT clone"
+alias gco="$GIT checkout"
+alias gd="$GIT diff"
+alias gigg="m $HOME/.gitignore_global"
+alias gpull="$GIT pull"
+alias gpush="$GIT push"
+alias gr="$GIT remote"
+alias gs="$GIT status"
+
+gy()
+{
+    if [[ $# -ne 1 ]]
+    then
+        echo 'Usage: gy <exactly-one-file-path>' >&2
+        return 1
+    fi
+    $GIT log --no-decorate -- "$1" \
+    | $ESED -n 's/^Date:.* ([12][9012][0-9][0-9]) .*$/\1/p' \
+    | /usr/bin/sort -u
+}
+
+# Erlang
+alias r15=". $LOCAL_OTP_DIR/otp-15/activate"
+alias r16=". $LOCAL_OTP_DIR/otp-16/activate"
+alias r17=". $LOCAL_OTP_DIR/otp-17/activate"
+alias r18=". $LOCAL_OTP_DIR/otp-18/activate"
+alias unkerl='kerl_deactivate'
+alias we='whence erl'
+
+#
+# get this list with:
+#
+#   cat ~/.shrc /usr/local/etc/sh.* | $ESED -n "s/^[[:space:]]*(alias[[:space:]]+([[:alnum:]_-]+)=.*|([[:alnum:]_]+)\\(\\)[[:space:]]*)\$/    echo '    \\2\\3 '/p" | sort -u
+#
+# or just the missing ones:
+#
+#   cat ~/.shrc /usr/local/etc/sh.* | $ESED -n "s/^[[:space:]]*(alias[[:space:]]+([[:alnum:]_-]+)=.*|([[:alnum:]_]+)\\(\\)[[:space:]]*)\$/\\2\\3/p" | sort -u | while read n ; do egrep -q "^[[:space:]]+echo[[:space:]]+'[[:space:]]*$n[[:space:]]" ~/.shrc || echo "    echo '    $n '" ; done
+#
+ss()
+{
+    echo '    aws-scp scp with aws identity'
+    echo '    aws-ssh ssh with aws identity & rmate port'
+    echo '    chimera ssh to chimera with rmate port'
+    echo '    gramma  ssh to gramma with rmate port'
+    echo '    tshome  ssh to tshome with rmate port'
+    echo '    scp     scp -p'
+    echo ''
+    echo '    la      ls -lhA'
+    echo '    lat     ls -lhAtr'
+    echo '    lh      ls -lhH'
+    echo '    ll      ls -lh'
+    echo '    lld     ls -lhd'
+    echo '    lll     ls -lho@'
+    echo '    lr      ls -lhR'
+    echo '    lt      ls -lhtr'
+    echo ''
+    echo '    g       git'
+    echo '    ga      git add'
+    echo '    gaa     git add -A'
+    echo '    gb      git branch'
+    echo '    gci     git commit'
+    echo '    gcl     git clone'
+    echo '    gco     git checkout'
+    echo '    gd      git diff'
+    echo '    giga    mate active gitignore'
+    echo '    gigg    mate global gitignore'
+    echo '    gpull   git pull'
+    echo '    gpush   git push'
+    echo '    gr      git remote'
+    echo '    gs      git status'
+    echo '    gy      <path>  list commit years of one file'
+    echo ''
+    echo '    b       cd ~/prj/basho'
+    echo '    t       cd ~/prj/tedb'
+    echo '    e       mate'
+    echo '    m       mate -m ...'
+    echo ''
+    echo '    r15     activate erlang R15..basho-current'
+    echo '    r16     activate erlang R16..basho-current'
+    echo '    r17     activate erlang OTP-17..basho-current'
+    echo '    r18     activate erlang OTP-18..basho-current'
+    echo '    we      whence erl'
+    echo '    unkerl  kerl_deactivate'
+    echo ''
+    echo '    chdir   same as cd'
+    echo '    d2utcs  <DateTime>  parse default time string to UTC seconds'
+    echo '    df      df -h'
+    echo '    dircp   copy directory with pax'
+    echo '    dirpath echo the fully-qualified directory name of the argument'
+    echo '    dscl    dscl -raw .'
+    echo '    ideadirs list idea project and preferences directories'
+    echo '    ideaerls edit idea Erlang (JDK) table'
+    echo '    isvar   is argument an environment variable'
+    echo '    lchflags  chflags -h'
+    echo '    ldd     list dynamic lib dependencies'
+    echo '    newbash <path>  create a bash executable script'
+    echo '    newes   <path>  create an escript executable script'
+    echo '    newksh  <path>  create a ksh executable script'
+    echo '    newscr  <interpretter> <path>  create an executable script'
+    echo '    newsh   <path>  create a sh executable script'
+    echo '    newzsh  <path>  create a zsh executable script'
+    echo '    pldump  <path>  dump plist file as xml'
+    echo '    remake  make clean && make'
+    echo '    rp      ruby tutorial'
+    echo '    rtconf  mate riak_test config'
+    echo '    typeof  type of command argument is interpretted as'
+    echo '    unhide  chflags -h nohidden'
+    echo '    utcs    print current time as UTC seconds'
+    echo '    utcs2d  <UtcSecs>  print default time string'
+    echo '    whence  ksh-like whence'
+    echo '    whereis find all instances of command'
+    echo ''
+    echo '    cdl     cd && lenv'
+    echo '    lenv    [re]load custom environment for current or parent directory'
+    echo '    shconf  mate shell rc'
+    echo '    shrc    reload shell rc'
+    echo '    ss      display this list'
+    echo ''
+}

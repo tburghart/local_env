@@ -1,0 +1,12 @@
+#!/bin/ksh -e
+
+[[ $# -gt 0 ]] || exec "$0" "$(pwd)"
+
+readonly  curdir="$(pwd)"
+
+for otpsrc in "$@"
+do
+    cd "$otpsrc"
+    "$LOCAL_ENV_DIR/otp.replace.as" "$(pwd)" "$(basename "$(pwd)")"
+    cd "$curdir"
+done

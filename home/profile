@@ -2,6 +2,17 @@
 # .profile - Shell startup script for login shells
 #
 
+BASHO_PRJ_BASE="$HOME/prj/basho"
+TRB_PRJ_BASE="$HOME/prj/tedb"
+LOCAL_ENV_DIR="$TRB_PRJ_BASE/local_env"
+for LOCAL_OTP_DIR in \
+    '/opt/basho' '/opt/local' '/usr/local' \
+    "$BASHO_PRJ_BASE/local" "$TRB_PRJ_BASE/local" "$HOME/local"
+do
+    if [[ -d "$LOCAL_OTP_DIR" && -w "$LOCAL_OTP_DIR" ]] ; then break ; fi
+done
+export BASHO_PRJ_BASE TRB_PRJ_BASE LOCAL_ENV_DIR LOCAL_OTP_DIR
+
 stype="$(uname -s)"
 mtype="$(uname -m)"
 usern="${LOGNAME:-${USER:-$(id -un)}}"
@@ -17,61 +28,63 @@ unset_vars="$unset_vars pathbeg pathend pathadd bpath spath"
 if [[ "$stype" == 'Darwin' && "$(sw_vers -productName)" == 'Mac OS X' ]]
 then
     gui='OSX'
-	if [[ -d "$HOME/bin/OsX" ]]
-	then
-		bpath="${bpath:+${bpath}:}$HOME/bin/OsX"
-	fi
-	if [[ -d "${HOME}/sbin/OsX" ]]
-	then
-		spath="${spath:+${spath}:}$HOME/sbin/OsX"
-	fi
+    if [[ -d "$HOME/bin/OsX" ]]
+    then
+        bpath="${bpath:+${bpath}:}$HOME/bin/OsX"
+    fi
+    if [[ -d "${HOME}/sbin/OsX" ]]
+    then
+        spath="${spath:+${spath}:}$HOME/sbin/OsX"
+    fi
 else
     pathend="/usr/X11R7 /usr/X11R6 $pathend"
     pathadd="$pathadd /usr/bin/X11R7 /usr/bin/X11R6 /usr/bin/X11"
 fi
 unset_vars="$unset_vars gui"
 
-for d in "$stype/$mtype" "$stype"
+for d in "/$stype/$mtype" "/$stype" ''
 do
-	if [[ -d "$HOME/bin/$d" ]]
-	then
-		bpath="${bpath:+${bpath}:}${HOME}/bin/$d"
-	fi
-	if [[ -d "$HOME/sbin/$d" ]]
-	then
-		spath="${spath:+${spath}:}${HOME}/sbin/$d"
-	fi
+    if [[ -d "$HOME/bin${d}" ]]
+    then
+        bpath="${bpath:+${bpath}:}${HOME}/bin${d}"
+    fi
+    if [[ -d "$HOME/sbin${d}" ]]
+    then
+        spath="${spath:+${spath}:}${HOME}/sbin${d}"
+    fi
 done
 unset_vars="$unset_vars d"
 
-for d in $HOME $pathbeg ${PATH//:/ } / $pathend
+bpath="${bpath:+${bpath}:}${LOCAL_ENV_DIR}"
+
+for d in $pathbeg ${PATH//:/ } / $pathend
 do
-	case "$d" in
-		/ )
-			b='/bin'
-			s='/sbin'
-			;;
-		*/bin )
-			b="$d"
-			s=''
-			;;
-		*/sbin )
-			b=''
-			s="$d"
-			;;
-		* )
-			b="$d/bin"
-			s="$d/sbin"
-			;;
-	esac
-	if [[ -n "$b" && -d "$b" ]] && ! [[ "$bpath" =~ ^(.*:)?$b(:.*)?$ ]]
-	then
-		bpath="${bpath:+${bpath}:}$b"
-	fi
-	if [[ -n "$s" && -d "$s" ]] && ! [[ "$spath" =~ ^(.*:)?$s(:.*)?$ ]]
-	then
-		spath="${spath:+${spath}:}$s"
-	fi
+    case "$d" in
+        / )
+            b='/bin'
+            s='/sbin'
+            ;;
+        */bin )
+            b="$d"
+            s=''
+            ;;
+        */sbin )
+            b=''
+            s="$d"
+            ;;
+        * )
+            b="$d/bin"
+            s="$d/sbin"
+            ;;
+    esac
+    if [[ -n "$b" && -d "$b" ]] && ! [[ "$bpath" =~ ^(.*:)?$b(:.*)?$ ]]
+    then
+        bpath="${bpath:+${bpath}:}$b"
+    fi
+    if [[ -n "$s" && -d "$s" ]] && ! [[ "$spath" =~ ^(.*:)?$s(:.*)?$ ]]
+    then
+        spath="${spath:+${spath}:}$s"
+    fi
 done
 unset_vars="$unset_vars b s"
 
@@ -80,10 +93,10 @@ unset_vars="$unset_vars b s"
 #
 for d in $pathadd
 do
-	if [[ -d "$d" ]] && ! [[ "$bpath" =~ ^(.*:)?$d(:.*)?$ ]]
-	then
-		bpath="${bpath:+${bpath}:}$d"
-	fi
+    if [[ -d "$d" ]] && ! [[ "$bpath" =~ ^(.*:)?$d(:.*)?$ ]]
+    then
+        bpath="${bpath:+${bpath}:}$d"
+    fi
 done
 
 PATH="$bpath:$spath"
@@ -144,24 +157,13 @@ P4EDITOR="$VISUAL"
 WINEDITOR="$VISUAL"
 export VISUAL P4EDITOR WINEDITOR
 
-BASHO_PRJ_BASE="$HOME/prj/basho"
-TRB_PRJ_BASE="$HOME/prj/tedb"
-LOCAL_ENV_DIR="$TRB_PRJ_BASE/local_env"
-for LOCAL_OTP_DIR in \
-    '/opt/basho' '/opt/local' '/usr/local' \
-    "$BASHO_PRJ_BASE/local" "$TRB_PRJ_BASE/local" "HOME/local"
-do
-    if [[ -d "$LOCAL_OTP_DIR" && -w "$LOCAL_OTP_DIR" ]] ; then break ; fi
-done
-export BASHO_PRJ_BASE TRB_PRJ_BASE LOCAL_ENV_DIR LOCAL_OTP_DIR
-
 unset $unset_vars unset_vars 2>/dev/null
 
 if [[ -f "$HOME/.shrc" ]]
 then
-	ENV="$HOME/.shrc"
-	export ENV
-	. "$ENV"
+    ENV="$HOME/.shrc"
+    export ENV
+    . "$ENV"
 fi
 
 # in case $HOME is changed along the way ...

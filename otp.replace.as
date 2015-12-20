@@ -5,11 +5,29 @@ typeset -ir verbosity='0'
 
 usage()
 {
-    echo "Usage: ${0##*/} otp-name-or-path otp-inst-label" >&2
+    echo "Usage: ${0##*/} [-h{0|1|2}] otp-name-or-path otp-inst-label" >&2
     exit 1
 }
 
-[[ $# == 2 ]] || usage
+case "$1" in
+    '-h0' )
+        hipe_modes='false'
+        shift
+        ;;
+    '-h1' )
+        hipe_modes='true'
+        shift
+        ;;
+    '-h2' )
+        hipe_modes='false true'
+        shift
+        ;;
+    * )
+        unset hipe_modes
+        ;;
+esac
+
+[[ $# -eq 2 ]] || usage
 [[ "$2" != */* ]] || usage
 
 typeset -lr otp_name="${2}"
@@ -46,12 +64,30 @@ unset   ERL_TOP ERL_LIBS MAKEFLAGS
 . "$LOCAL_ENV_DIR/otp.install.base"
 . "$LOCAL_ENV_DIR/otp.source.version"
 
-if [[ $otp_vsn_major -gt 16 ]]
+hipe_supported()
+{
+    if [[ $otp_vsn_major -gt 16 && "$os_type" != 'darwin' ]]
+    then
+        return 0
+    else
+        return 1
+    fi
+}
+
+if [[ -n "$hipe_modes" ]]
+then
+    if [[ "$hipe_modes" == *true* ]] && ! hipe_supported
+    then
+        echo HiPE is not supported on this Release/Platform >&2
+        exit 1
+    fi
+elif hipe_supported
 then
     hipe_modes='false true'
 else
     hipe_modes='false'
 fi
+
 arch_flags='-m64 -march=core2 -mcx16'
 arch_flags='-m64 -march=native -mcx16'
 case "$os_type" in
@@ -61,7 +97,6 @@ case "$os_type" in
         ccands='icc /usr/bin/cc gcc cc'
         cccands='/usr/bin/c++ g++ c++'
         config_os='--enable-darwin-64bit --with-cocoa'
-        hipe_modes='false'
         ;;
     linux )
         ccands='icc gcc cc'

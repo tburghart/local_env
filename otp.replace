@@ -1,12 +1,25 @@
 #!/bin/ksh -e
 
-[[ $# -gt 0 ]] || exec "$0" "$(pwd)"
+usage()
+{
+    echo "Usage: ${0##*/} [-h{0|1|2}] [otp-path]" >&2
+    exit 1
+}
+
+if [[ "$1" == -h[012] ]]
+then
+    hipe_switch="$1"
+    shift
+else
+    unset hipe_switch
+fi
+[[ $# -gt 0 ]] || exec "$0" $hipe_switch "$(pwd)"
 
 readonly  curdir="$(pwd)"
 
 for otpsrc in "$@"
 do
     cd "$otpsrc"
-    "$LOCAL_ENV_DIR/otp.replace.as" "$(pwd)" "$(basename "$(pwd)")"
+    "$LOCAL_ENV_DIR/otp.replace.as" $hipe_switch "$(pwd)" "$(basename "$(pwd)")"
     cd "$curdir"
 done

@@ -46,6 +46,12 @@ unset   ERL_TOP ERL_LIBS MAKEFLAGS
 . "$LOCAL_ENV_DIR/otp.install.base"
 . "$LOCAL_ENV_DIR/otp.source.version"
 
+if [[ $otp_vsn_major -gt 16 ]]
+then
+    hipe_modes='false true'
+else
+    hipe_modes='false'
+fi
 arch_flags='-m64 -march=core2 -mcx16'
 arch_flags='-m64 -march=native -mcx16'
 case "$os_type" in
@@ -55,6 +61,7 @@ case "$os_type" in
         ccands='icc /usr/bin/cc gcc cc'
         cccands='/usr/bin/c++ g++ c++'
         config_os='--enable-darwin-64bit --with-cocoa'
+        hipe_modes='false'
         ;;
     linux )
         ccands='icc gcc cc'
@@ -118,14 +125,14 @@ ERL_TOP="$(pwd)"
 PATH="$ERL_TOP/bin:$PATH"
 export  ERL_TOP PATH
 
-for hipe in false true
+for hipe in $hipe_modes
 do
     if $hipe
     then
-        otp_label="$otp_name-h1"
+        otp_label="${otp_name}h"
         hipe_flag='--enable-hipe'
     else
-        otp_label="$otp_name-h0"
+        otp_label="$otp_name"
         hipe_flag='--disable-hipe'
     fi
     otp_dest="$otp_install_base/$otp_label"

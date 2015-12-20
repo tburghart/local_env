@@ -38,21 +38,28 @@ else
         | head -1 | cut -f3 -d, | cut -f2 '-d"')"
 fi
 
-for dir in lib/erlang/erts-* lib/erlang/lib/?*-*
-do
-    # only link to directories
-    [[ -d "$dir" ]] || continue
-    dname="${dir##*/}"
-    label="${dname%%-*}"
-    # make sure we're not linking to ourself!
-    [[ "$dname" != "$label" ]] || continue
-    /bin/ln -sf "$dname" "${dir%/*}/$label"
-done
+readonly  erts_path="$(ls -1d lib/erlang/erts-* 2>/dev/null | tail -1)"
+if [[ -z "$erts_path" || ! -d "$erts_path" ]]
+then
+    echo "$sname error: ERTS not found" >&2
+    exit 2
+fi
+readonly  erts_vers="${erts_path#lib/erlang/erts-}"
+
+app_path()
+{
+    _ap_name="$1"
+    _ap_path=$(ls -1d lib/erlang/lib/${_ap_name}-* 2>/dev/null | tail -1)
+    if [[ -z "$_ap_path" || ! -d "$_ap_path" ]]
+    then
+        echo "$sname error: app '$_ap_name' not found" >&2
+        exit 2
+    fi
+    echo "$_ap_path"
+}
 
 readonly  index_file="$inst_path/index.html"
 readonly  href_entry='<a href="%s">%s</a>'
-
-typeset -u  utext="$1"
 
 cat <<EOF >"$index_file"
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Strict//EN">
@@ -81,15 +88,15 @@ cat <<EOF >"$index_file"
     <hr>
     <h3>Quick Access</h3>
     <p>
-      <a href="lib/erlang/erts/doc/html/erlang.html">ERTS</a>
-      - <a href="lib/erlang/lib/sasl/doc/html/index.html">SASL</a>
-    - <a href="lib/erlang/lib/kernel/doc/html/index.html">Kernel</a>
-    - <a href="lib/erlang/lib/stdlib/doc/html/index.html">STDLIB</a>
-    - <a href="lib/erlang/lib/crypto/doc/html/crypto.html">Crypto</a>
-    - <a href="lib/erlang/lib/compiler/doc/html/compile.html">Compiler</a>
-    - <a href="lib/erlang/lib/eunit/doc/html/chapter.html">EUnit</a>
-    - <a href="lib/erlang/lib/dialyzer/doc/html/dialyzer.html">Dialyzer</a>
-    - <a href="lib/erlang/lib/debugger/doc/html/debugger_chapter.html">Debugger</a>
+      <a href="$erts_path/doc/html/erlang.html">ERTS</a>
+      - <a href="$(app_path sasl)/doc/html/index.html">SASL</a>
+      - <a href="$(app_path kernel)/doc/html/index.html">Kernel</a>
+      - <a href="$(app_path stdlib)/doc/html/index.html">STDLIB</a>
+      - <a href="$(app_path crypto)/doc/html/crypto.html">Crypto</a>
+      - <a href="$(app_path compiler)/doc/html/compile.html">Compiler</a>
+      - <a href="$(app_path eunit)/doc/html/chapter.html">EUnit</a>
+      - <a href="$(app_path dialyzer)/doc/html/dialyzer.html">Dialyzer</a>
+      - <a href="$(app_path debugger)/doc/html/debugger_chapter.html">Debugger</a>
     </p>
     <hr>
     <h3>Package Documentation</h3>
@@ -97,14 +104,15 @@ cat <<EOF >"$index_file"
       <tbody>
         <tr>
           <th>Erlang/ERTS</td>
-          <td><a href="lib/erlang/erts/doc/html/erlang.html">API</a></td>
-          <td><a href="lib/erlang/erts/doc/html/release_notes.html">Release Notes</a></td>
+          <td>$erts_vers</td>
+          <td><a href="$erts_path/doc/html/erlang.html">API</a></td>
+          <td><a href="$erts_path/doc/html/release_notes.html">Release Notes</a></td>
         </tr>
 EOF
 
-for p in lib/erlang/lib/*
+for p in lib/erlang/lib/*-*
 do
-    [[ -L "$p" ]] || continue
+    [[ -d "$p" ]] || continue
     if [[ -f "$p/doc/html/index.html" ]]
     then
         ix_ent="<a href=\"$p/doc/html/index.html\">API</a>"
@@ -118,9 +126,11 @@ do
         unset rn_ent
     fi
     [[ -n "$ix_ent" || -n "$rn_ent" ]] || continue
+    n="${p##*/}"
     cat <<EOF
         <tr>
-          <th>${p##*/}</td>
+          <th>${n%%-*}</td>
+          <td>${n#*-}</td>
           <td>${ix_ent}</td>
           <td>${rn_ent}</td>
         </tr>

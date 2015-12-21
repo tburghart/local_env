@@ -1,0 +1,46 @@
+#!/bin/ksh -e
+
+readonly  sdir="$(cd "$(dirname "$0")" && pwd)"
+readonly  sname="${0##*/}"
+readonly  spath="$sdir/$sname"
+
+usage()
+{
+    echo "Usage: ${0##*/} [-b branch-or-tag] otp-inst-label" >&2
+    exit 1
+}
+
+if [[ $# -eq 1 ]]
+then
+    otpdir="$1"
+    brargs=''
+elif [[ $# -eq 3 && "$1" == '-b' ]]
+then
+    otpdir="$3"
+    brargs="$1 $2"
+else
+    usage
+fi
+cd "$BASHO_PRJ_BASE"
+
+$GIT clone $brargs 'git@github.com:basho/otp.git' "$otpdir"
+
+cd "$otpdir"
+readonly  otpdir="$(pwd)"
+
+envdir="../../${LOCAL_ENV_DIR#${HOME}/prj/}"
+if [[ -d "$envdir" ]]
+then
+    cd "$envdir"
+    [[ "$(pwd)" == "$LOCAL_ENV_DIR" ]] || envdir="$LOCAL_ENV_DIR"
+    cd "$otpdir"
+else
+    envdir="$LOCAL_ENV_DIR"
+fi
+readonly  envdir
+
+ln -s "$envdir/env.otp.shared" env
+
+$GIT remote add --tags erlang git@github.com:erlang/otp.git
+$GIT remote add --no-tags tedb git@github.com:tburghart/otp.git
+$GIT remote add --no-tags vinoski git@github.com:vinoski/otp.git

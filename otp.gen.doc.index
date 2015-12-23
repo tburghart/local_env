@@ -144,3 +144,6 @@ cat <<EOF >>"$index_file"
   </body>
 </html>
 EOF
+
+echo Wrote "'$index_file'"
+

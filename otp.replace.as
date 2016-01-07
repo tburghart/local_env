@@ -1,7 +1,7 @@
 #!/bin/ksh -e
 
 typeset -ir makejobs='5'
-typeset -ir verbosity='0'
+typeset -ir verbosity="${V:-0}"
 
 usage()
 {
@@ -66,7 +66,8 @@ unset   ERL_TOP ERL_LIBS MAKEFLAGS
 
 hipe_supported()
 {
-    if [[ $otp_vsn_major -gt 16 && "$os_type" != 'darwin' ]]
+    if [[ $otp_vsn_major -gt 16 && "$os_type" != 'darwin' ]] \
+    || [[ $otp_vsn_major -gt 15 && "$os_type" == 'linux' ]]
     then
         return 0
     else
@@ -88,8 +89,16 @@ else
     hipe_modes='false'
 fi
 
+opt_flags='-O2'
+opt_flags='-O3'
+opt_flags='-fomit-frame-pointer -O3'
+
+arch_flags='-m64 -mcx16'
 arch_flags='-m64 -march=core2 -mcx16'
 arch_flags='-m64 -march=native -mcx16'
+
+config_os='--enable-64bit'
+
 case "$os_type" in
     darwin )
         osx_ver="$(/usr/bin/sw_vers -productVersion | /usr/bin/cut -d. -f1,2)"
@@ -101,17 +110,14 @@ case "$os_type" in
     linux )
         ccands='icc gcc cc'
         cccands='g++ gcc c++'
-        config_os='--enable-64bit'
         ;;
     freebsd )
-        ccands='icc clang37 /usr/bin/cc gcc cc'
+        ccands='icc clang39 clang38 clang37 /usr/bin/cc gcc cc'
         cccands='/usr/bin/c++ g++ c++'
-        config_os='--enable-64bit'
         ;;
     * )
         ccands='cc gcc'
-        cccands='c++ g++'
-        config_os='--enable-64bit'
+        cccands='c++ g++ gcc'
         ;;
 esac
 for c in $ccands
@@ -131,9 +137,9 @@ else
 fi
 unset   c ccand cccand
 [[ -n "$LANG" ]] || LANG='C'
-LDFLAGS="$arch_flags -O4"
+LDFLAGS="$arch_flags $opt_flags"
 
-CFLAGS="$arch_flags -O3"
+CFLAGS="$arch_flags $opt_flags"
 if [[ $otp_vsn_major -lt 17 ]]
 then
     CFLAGS+=' -Wno-deprecated-declarations'
@@ -159,6 +165,8 @@ config_opts="$config_os --with-ssl --without-odbc"
 ERL_TOP="$(pwd)"
 PATH="$ERL_TOP/bin:$PATH"
 export  ERL_TOP PATH
+
+unset   V MAKEFLAGS
 
 for hipe in $hipe_modes
 do

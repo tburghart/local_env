@@ -30,7 +30,7 @@ esac
 [[ $# -eq 2 ]] || usage
 [[ "$2" != */* ]] || usage
 
-typeset -lr otp_name="${2}"
+typeset  -r otp_name="${2}"
 
 case "$1" in
     */* )
@@ -91,7 +91,6 @@ fi
 
 opt_flags='-O2'
 opt_flags='-O3'
-opt_flags='-fomit-frame-pointer -O3'
 
 arch_flags='-m64 -mcx16'
 arch_flags='-m64 -march=core2 -mcx16'

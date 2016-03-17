@@ -5,15 +5,19 @@
 #
 env_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-[[ -z "$(type -t kerl_deactivate)" ]] || kerl_deactivate
+kerl_deactivate 2>/dev/null || true
 
 # Set, and use, _KERL_PATH_REMOVABLE as kerl would, because an
 # actual kerl `activate` script will overwrite our kerl_deactivate
 # function rather than calling it first.
 
-export  _KERL_PATH_REMOVABLE="$env_dir/bin"
+[[ -z "$_KERL_PATH_REMOVABLE" ]] || PATH="${PATH//${_KERL_PATH_REMOVABLE}:/}"
+
+_KERL_PATH_REMOVABLE="$env_dir/bin"
+PATH="$_KERL_PATH_REMOVABLE:${PATH//${_KERL_PATH_REMOVABLE}:/}"
+
 unset   env_dir
-export  PATH="$_KERL_PATH_REMOVABLE:${PATH//${_KERL_PATH_REMOVABLE}:/}"
+export  PATH _KERL_PATH_REMOVABLE
 
 kerl_deactivate()
 {
@@ -21,9 +25,9 @@ kerl_deactivate()
     then
         export  PATH="${PATH//${_KERL_PATH_REMOVABLE}:/}"
         unset   _KERL_PATH_REMOVABLE
-        hash    -r
+        hash    -r 2>/dev/null || true
     fi
     unset   -f kerl_deactivate
 }
 
-hash -r
+hash -r 2>/dev/null || true

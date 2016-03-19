@@ -523,16 +523,42 @@ alias gr="$GIT remote"
 alias gs="$GIT status"
 alias gt="$GIT tag"
 
-gy()
+gscrub()
 {
-    if [[ $# -ne 1 ]]
+    local arg
+    for arg in "$@"
+    do
+        case "$arg" in
+            -h|--help)
+                echo 'Usage: gscrub [-ifnq] [-e <pattern>]' >&2
+                echo 'Scrubs the current git repository without mercy!' >&2
+                echo "Parameters are passed to 'git clean' unmodified" >&2
+                echo "Note that '-f' is already included, adding it a second time will wipe lower-level repos (deps)" >&2
+                return 1
+            ;;
+        esac
+    done
+    if [[ ! -d '.git' ]]
     then
-        echo 'Usage: gy <exactly-one-file-path>' >&2
-        return 1
+        echo "gscrub: error: not at the top of a git repo" >&2
+        return 2
     fi
-    $GIT log --no-decorate -- "$1" \
-    | $ESED -n 's/^Date:.* ([12][9012][0-9][0-9]) .*$/\1/p' \
-    | /usr/bin/sort -u
+    unset REPLY
+    printf 'Are you SURE you want to remove all untracked files under\n\t%s?\n' "$(pwd)"
+    while read -p '[y/n]: '
+    do
+        case "$REPLY" in
+            [yY]|[yY][eE][sS])
+                break
+                ;;
+            [nN]|[nN][oO])
+                return 0
+                echo 'when you change your mind, use:'
+                echo "$GIT clean -fdqx -e /env -e /env.local -e /.idea/ -e '*.iml' -e '/*.txt'"
+                ;;
+        esac
+    done
+    $GIT clean -fdqx -e /env -e /env.local -e /.idea/ -e '*.iml' -e '/*.txt' "$@"
 }
 
 gti()
@@ -558,6 +584,18 @@ gti()
         rm "$tmp"
     fi
     return $ret
+}
+
+gy()
+{
+    if [[ $# -ne 1 ]]
+    then
+        echo 'Usage: gy <exactly-one-file-path>' >&2
+        return 1
+    fi
+    $GIT log --no-decorate -- "$1" \
+    | $ESED -n 's/^Date:.* ([12][9012][0-9][0-9]) .*$/\1/p' \
+    | /usr/bin/sort -u
 }
 
 # Erlang
@@ -612,6 +650,7 @@ ss()
     printf "$env_ss_format" 'gpush' 'git push'
     printf "$env_ss_format" 'gr' 'git remote'
     printf "$env_ss_format" 'gs' 'git status'
+    printf "$env_ss_format" 'gscrub' 'scrub the current git repository without mercy!'
     printf "$env_ss_format" 'gt' 'git tag'
     printf "$env_ss_format" 'gti' '<tag>  list info about one tag'
     printf "$env_ss_format" 'gy' '<path>  list commit years of one file'

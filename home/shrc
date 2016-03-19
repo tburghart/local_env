@@ -301,6 +301,13 @@ lenv()
             {
                 [[ "$(typeof kerl_deactivate)" == 'undefined' ]] || kerl_deactivate
 
+                if [[ -n "$env_reset_path" ]]
+                then
+                    PATH="$env_reset_path"
+                    unset env_reset_path
+                    export PATH
+                    hash -r
+                fi
                 if [[ -n "$env_reset_unalias" ]]
                 then
                     unalias $env_reset_unalias 2>/dev/null
@@ -499,11 +506,15 @@ alias gci="$GIT commit"
 alias gcl="$GIT clone"
 alias gco="$GIT checkout"
 alias gd="$GIT diff"
+alias gds="$GIT describe"
 alias gigg="m $HOME/.gitignore_global"
+alias gl="$GIT log"
+alias glr="$GIT log -n 2"
 alias gpull="$GIT pull"
 alias gpush="$GIT push"
 alias gr="$GIT remote"
 alias gs="$GIT status"
+alias gt="$GIT tag"
 
 gy()
 {
@@ -515,6 +526,31 @@ gy()
     $GIT log --no-decorate -- "$1" \
     | $ESED -n 's/^Date:.* ([12][9012][0-9][0-9]) .*$/\1/p' \
     | /usr/bin/sort -u
+}
+
+gti()
+{
+    if [[ $# -ne 1 ]]
+    then
+        echo 'Usage: gti <exactly-one-tag>' >&2
+        return 1
+    fi
+    local ref
+    local ret
+    local tmp
+    ref="$($GIT rev-parse "$1")"
+    ret=$?
+    if [[ $ret -eq 0 ]]
+    then
+        tmp="$(mktemp '/tmp/gt.XXXXXXX')"
+        $GIT cat-file -p "$ref" >> "$tmp"
+        ref="$(awk '/^tagger[[:space:]]/ {print $(NF-1), $(NF)}' "$tmp")"
+        ref="$(date -jf '%s' "${ref%% *}" '+%Y-%m-%d %H:%M:%S') ${ref##* }"
+        printf '%s\t%s\n' "$1" "$ref"
+        cat "$tmp"
+        rm "$tmp"
+    fi
+    return $ret
 }
 
 # Erlang
@@ -560,17 +596,22 @@ ss()
     echo '    gcl     git clone'
     echo '    gco     git checkout'
     echo '    gd      git diff'
-    echo '    giga    mate active gitignore'
-    echo '    gigg    mate global gitignore'
+    echo '    gds     git describe'
+    echo '    giga    edit active gitignore'
+    echo '    gigg    edit global gitignore'
+    echo '    gl      git log'
+    echo '    glr     git log recent'
     echo '    gpull   git pull'
     echo '    gpush   git push'
     echo '    gr      git remote'
     echo '    gs      git status'
+    echo '    gt      git tag'
+    echo '    gti     <tag>  list info about one tag'
     echo '    gy      <path>  list commit years of one file'
     echo ''
     echo '    b       cd ~/prj/basho'
     echo '    t       cd ~/prj/tedb'
-    echo '    e       mate'
+    echo '    e       edit'
     echo '    m       mate -m ...'
     echo ''
     echo '    r15     activate erlang R15..basho-current'

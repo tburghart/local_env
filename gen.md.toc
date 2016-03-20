@@ -1,0 +1,46 @@
+#!/bin/ksh -e
+#
+# Quick and dirty Markdown TOC generator.
+#
+# Only finds headers where the line begins with a contiguous array of
+# '#' characters - underline format is ignored.
+#
+# TOC is written to standard output.
+#
+# 'mindepth' and 'maxdepth' set the number of '#' preceeding the headers
+# to include. The first header gets special handling to not include an
+# existing TOC.
+#
+
+typeset -ir mindepth='2'
+typeset -ir maxdepth='6'
+
+if [[ $# -ne 1 || ! -f "$1" ]]
+then
+    echo "Usage: ${0##*/} input-file.md" >&2
+    exit 1
+fi
+
+typeset     token label href
+typeset -i  depth space width
+typeset     first='true'
+egrep "^#{${mindepth},${maxdepth}}[^#]" "$1" | while read header
+do
+    token="${header%%[^#]*}"
+    depth="${#token}"
+    label="${header:${depth}}"
+    space="${label%%[^ ]*}"
+    label="${label:${#space}}"
+    width="$(((($depth - $mindepth) * 2) + 1))"
+
+    typeset -l  href="${label// /-}"
+    if $first
+    then
+        first='false'
+        if [[ "$href" == 'contents' || "$href" == 'table-of-contents' ]]
+        then
+            continue
+        fi
+    fi
+    printf '%*s [%s](#%s)\n' "$width" '*' "$label" "$href"
+done

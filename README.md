@@ -37,6 +37,10 @@ Since a lot of the projects I work on are different versions of the same
 packages, `lenv` is often a symbolic link to one of the `env...shared` files
 in this directory, so I can maintain them in a single place.
 
+I'm trying to move more and more to separating discrete functionality out into
+discrete files so I can tinker with them individually, so you'll fine a lot of
+files source other files in this directory to pick up common functionality.
+
 ## Other Stuff
 
 There's a bunch of other stuff in here as well, and you're welcome to prowl
@@ -45,5 +49,5 @@ that's not likely to change.
 
 ## License
 
-To the extent anyone cares, consider it all covered by this BSD-ish
+To the extent anyone cares, consider it all covered by this highly permisive
 [license](LICENSE).

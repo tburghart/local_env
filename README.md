@@ -20,7 +20,7 @@ benefits over Bash, and I've just stuck with it.
 
 This directory lives at `$LOCAL_ENV_DIR`, which is set in
 [$HOME/.profile](home/profile) and included in my `$PATH`.
-The files in the [home] subdirectory here are installed in my `$HOME`
+The files in the [home](home) subdirectory here are installed in my `$HOME`
 directory with `.` prepended to their names, becoming the initializers
 of my shell environment.
 
@@ -45,4 +45,5 @@ that's not likely to change.
 
 ## License
 
-To the extent anyone cares, consider it all covered by this BSD-ish [LICENSE].
+To the extent anyone cares, consider it all covered by this BSD-ish
+[license](LICENSE).

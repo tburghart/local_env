@@ -301,6 +301,8 @@ lenv()
     then
         . "$lenv_target/$lenv_file"
         lenv_result=$?
+        unset $env_local_unset env_local_unset \
+            $(set | $ESED -n 's/^(local_[[:alnum:]_]+)=.*$/\1/p' | tr '\n' ' ')
         if [[ $lenv_result -ne 0 && "$(typeof reset_lenv)" != undefined ]]
         then
             reset_lenv

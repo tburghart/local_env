@@ -34,7 +34,7 @@ set up yet more custom commands.  It also has a reset capability, so if I
 `cd ... && lenv`) it unloads the previous environment and loads the new one.
 
 Since a lot of the projects I work on are different versions of the same
-packages, `lenv` is often a symbolic link to one of the `env...shared` files
+packages, `env` is often a symbolic link to one of the `env...shared` files
 in this directory, so I can maintain them in a single place.
 
 I'm trying to move more and more to separating discrete functionality out into

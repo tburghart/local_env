@@ -89,73 +89,63 @@ else
     hipe_modes='false'
 fi
 
-opt_flags='-O2'
-opt_flags='-O3'
+unset EXCLUDE_OSX_RT_VERS_FLAG
+. "$LOCAL_ENV_DIR/env.tool.defaults"
 
-arch_flags='-m64 -mcx16'
-arch_flags='-m64 -march=core2 -mcx16'
-arch_flags='-m64 -march=native -mcx16'
-
-config_os='--enable-64bit'
-
-case "$os_type" in
-    darwin )
-        osx_ver="$(/usr/bin/sw_vers -productVersion | /usr/bin/cut -d. -f1,2)"
-        arch_flags+=" -arch x86_64 -mmacosx-version-min=$osx_ver"
-        ccands='icc /usr/bin/cc gcc cc'
-        cccands='/usr/bin/c++ g++ c++'
-        config_os='--enable-darwin-64bit --with-cocoa'
-        ;;
-    linux )
-        ccands='icc gcc cc'
-        cccands='g++ gcc c++'
-        ;;
-    freebsd )
-        ccands='icc clang39 clang38 clang37 /usr/bin/cc gcc cc'
-        cccands='/usr/bin/c++ g++ c++'
-        ;;
-    * )
-        ccands='cc gcc'
-        cccands='c++ g++ gcc'
-        ;;
-esac
-for c in $ccands
-do
-    CC="$(whence -p $c || true)"
-    [[ -z "$CC" ]] || break
-done
-if [[ "${CC##*/}" == icc || "${CC##*/}" == clang* ]]
-then
-    CXX="$CC"
-else
-    for c in $cccands $CC
-    do
-        CXX="$(whence -p $c || true)"
-        [[ -z "$CXX" ]] || break
-    done
-fi
-unset   c ccand cccand
-[[ -n "$LANG" ]] || LANG='C'
-LDFLAGS="$arch_flags $opt_flags"
-
-CFLAGS="$arch_flags $opt_flags"
 if [[ $otp_vsn_major -lt 17 ]]
 then
-    CFLAGS+=' -Wno-deprecated-declarations'
-    CFLAGS+=' -Wno-empty-body'
-    CFLAGS+=' -Wno-implicit-function-declaration'
-    CFLAGS+=' -Wno-parentheses-equality'
-    CFLAGS+=' -Wno-pointer-sign'
-    CFLAGS+=' -Wno-tentative-definition-incomplete-type'
-    CFLAGS+=' -Wno-unused-function'
-    CFLAGS+=' -Wno-unused-value'
-    CFLAGS+=' -Wno-unused-variable'
+    add_flags=''
+    add_flags+=' -Wno-deprecated-declarations'
+    add_flags+=' -Wno-empty-body'
+    add_flags+=' -Wno-implicit-function-declaration'
+    add_flags+=' -Wno-parentheses-equality'
+    add_flags+=' -Wno-pointer-sign'
+    add_flags+=' -Wno-tentative-definition-incomplete-type'
+    add_flags+=' -Wno-unused-function'
+    add_flags+=' -Wno-unused-value'
+    add_flags+=' -Wno-unused-variable'
+
+    CFLAGS+="$add_flags"
+    CXXFLAGS+="$add_flags"
+    export  CFLAGS CXXFLAGS
+    unset   add_flags
 fi
-CXXFLAGS="$CFLAGS"
 
-export  CC CFLAGS CXX CXXFLAGS LANG LDFLAGS
-
-config_opts="$config_os --with-ssl --without-odbc"
+if [[ "$os_type" == 'darwin' ]]
+then
+    config_opts='--enable-darwin-64bit --with-cocoa'
+    if [[ -d '/usr/include/openssl' ]]
+    then
+        config_opts+=' --with-ssl'
+    else
+        xc_toolchains='/Applications/Xcode.app/Contents/Developer/Toolchains'
+        unset alt_sys_base
+        for n in \
+            '/XcodeDefault.xctoolchain/usr/lib/swift-migrator/sdk/MacOSX.sdk'
+        do
+            if [[ -d "$xc_toolchains/$n/usr/include/openssl" ]]
+            then
+                alt_sys_base="$xc_toolchains/$n"
+                break
+            fi
+        done
+        if [[ -z "$alt_sys_base" ]]
+        then
+            echo 'error: no OpenSSL headers found!' >&2
+            exit 2
+        fi
+        if [[ $otp_vsn_major -ge 17 ]]
+        then
+            config_opts+=" --with-ssl --with-ssl-incl=$alt_sys_base/usr"
+        else
+            config_opts+=" --with-ssl=$alt_sys_base/usr"
+        fi
+        unset xc_toolchains alt_sys_incl
+    fi
+else
+    config_opts='--enable-64bit --with-ssl'
+fi
+config_opts+=" --without-odbc"
 
 [[ $otp_vsn_major -ge 16 ]] || config_opts+=' --without-wx'
 [[ $otp_vsn_major -lt 17 ]] || config_opts+=' --without-gs'

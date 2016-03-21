@@ -300,6 +300,11 @@ lenv()
     if [[ -f "$lenv_target/$lenv_file" ]]
     then
         . "$lenv_target/$lenv_file"
+        lenv_result=$?
+        if [[ $lenv_result -ne 0 && "$(typeof reset_lenv)" != undefined ]]
+        then
+            reset_lenv
+        fi
         lenv_current="$lenv_target"
         if [[ "$(typeof reset_lenv)" == undefined && -z "$reset_lenv" ]]
         then
@@ -333,6 +338,12 @@ lenv()
                 unset -f reset_lenv
             }
         fi
+        if [[ $lenv_result -ne 0 ]]
+        then
+            reset_lenv
+            unset lenv_current
+        fi
+        unset lenv_result
     else
         unset lenv_current 2>/dev/null
     fi

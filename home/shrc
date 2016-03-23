@@ -497,14 +497,17 @@ alias ideadirs="/usr/bin/find ~/prj -type d -name .idea && echo ~/Library/Prefer
 alias t="cd $TRB_PRJ_BASE"
 
 # Dates
-alias utcs="/bin/date '+%s'"
+alias utcs="date '+%s'"
+# BSD and GNU versions of 'date' use different options, try both
 d2utcs()
 {
-    /bin/date -jf '%a %b %d %T %Z %Y' "$*" '+%s'
+    date -jf '%a %b %d %T %Z %Y' "$*" '+%s' 2>/dev/null \
+    || date "--date=$*" '+%s'
 }
 utcs2d()
 {
-    /bin/date -jf '%s' "$*"
+    date -jf '%s' "$*" 2>/dev/null \
+    || date "--date=@$*"
 }
 
 # Scripts
@@ -591,7 +594,9 @@ gti()
         tmp="$(mktemp '/tmp/gt.XXXXXXX')"
         $GIT cat-file -p "$ref" >> "$tmp"
         ref="$(awk '/^tagger[[:space:]]/ {print $(NF-1), $(NF)}' "$tmp")"
-        ref="$(date -jf '%s' "${ref%% *}" '+%Y-%m-%d %H:%M:%S') ${ref##* }"
+        # BSD and GNU versions of 'date' use different options, try both
+        ref="$(date -jf '%s' "${ref%% *}" '+%Y-%m-%d %H:%M:%S' 2>/dev/null \
+            || date "--date=@${ref%% *}" '+%Y-%m-%d %H:%M:%S') ${ref##* }"
         printf '%s\t%s\n' "$1" "$ref"
         cat "$tmp"
         rm "$tmp"

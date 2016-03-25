@@ -1,28 +1,80 @@
 #!/bin/bash -e
+#
+# Script to set up a complete Riak CS development environment.
+#
+# It DOES seek confirmation that you know what you're about to do, but once
+# you confirm it can do a LOT of damage, so be sure!
+#
+# Errors:
+#   If any command experiences an error, the script will stop dead wherever
+#   it is and exit. It has no recovery capability, so it goes through the
+#   entire sequence on every run, by design.
+#   Other than command errors, the other thing that will stop it short of
+#   completion is an existing target source directory that contains uncommitted
+#   changes, but it may do a lot of work before it gets to it, so you're wise
+#   to confirm beforehand.
+#
+# Notes:
+# - You DEFINITELY want to review what's in 'old_srcs', as they'll be
+#   deleted mercilessly!
+# - You'll almost certainly have to change the 'curr_otp_activate' and
+#   'prev_otp_activate' paths.
+# - Unless you're planning to go overboard on testing, you'll probably
+#   want to unset 'db_alt'.
+#
 
+#
+# current and previous versions for testing
+# these will all be built locally
+#
 readonly  cs_vers='2.1'
 readonly  db_vers='2.1'
 readonly  st_vers='2.1'
-
-# change to 'master' once 'basho-trb-node_package-change' is merged
-readonly  rt_spec='basho-trb-node_package-change'
 
 readonly  cs_prev='1.5.4p1'
 readonly  db_prev='1.4.12'
 readonly  st_prev='1.5.0'
 
+#
+# if "$db_alt" is set, it should refer to another version of Riak [EE] that's
+# [mostly] compatible with CS version $cs_vers, to be used for testing
+#
+readonly  db_alt='2.0'
+
+#
+# change to 'master' once 'basho-trb-node_package-change' is merged
+# it would be nice to match this to the Riak version, but the CS harness
+# uses features only in the master branch as of now
+#
+readonly  rt_spec='basho-trb-node_package-change'
+
+#
+# which OTP builds to use
+# Note that webmachine breaks if you build the 'previous' OTP from either
+# the OTP_R15B01_basho1 tag or the head of the basho-otp-15 branch, use tag
+# basho_OTP_R15B01p instead.
+#
+readonly  curr_otp_activate='/opt/basho/otp-16-b10/activate'
+readonly  prev_otp_activate='/opt/basho/otp-15-p1/activate'
+
+#
+# old source directories that will be DELETED ENTIRELY if found
+#
+readonly  old_srcs='riak riak_ee riak_cs stanchion'
+
+#
+# about this script
+#
 readonly  sdir="$(cd "$(dirname "$0")" && pwd)"
 readonly  sname="${0##*/}"
 readonly  spath="$sdir/$sname"
 
-readonly  curr_otp_activate='/opt/basho/otp-16-b10/activate'
-readonly  prev_otp_activate='/opt/basho/otp-15-p1/activate'
-
-readonly  rt_roots='riak riak_ee riak_cs_os riak_cs_ee stanchion'
-readonly  old_srcs='riak riak_ee riak_cs stanchion'
-
-readonly  os_type="$(uname -s)"
+#
+# assorted constants
+#
 readonly  eq_delim='========================'
+readonly  os_type="$(uname -s)"
+readonly  rt_roots='riak riak_ee riak_cs_os riak_cs_ee stanchion'
 
 case $# in
     0)
@@ -110,6 +162,7 @@ then
 fi
 if [[ -z "$EGREP" ]]
 then
+    unalias egrep 2>/dev/null || true
     EGREP="$(type -p egrep || true) egrep"
     EGREP="${EGREP%% *}"
     export EGREP
@@ -312,6 +365,22 @@ init_repo_version riak_ee   "$db_vers" "$db_prev"
 init_repo_version riak_cs   "$cs_vers" "$cs_prev"
 init_repo_version stanchion "$st_vers" "$st_prev"
 
+if [[ -n "$db_alt" ]]
+then
+    suff="$(cut -d. -f1,2 <<<"$db_alt")"
+    for repo in riak riak_ee
+    do
+        if [[ -n "$(cut -d. -f3 <<<"$db_alt")" ]]
+        then
+            spec="$repo-$db_alt"
+        else
+            spec="$db_alt"
+        fi
+        init_source_repo "$repo" "$spec" "$CS_TOP_DIR/$repo-$suff"
+        init_test_build "$curr_otp_activate" "$CS_TOP_DIR/$repo-$suff" "$RT_TOP_DIR/$repo/$suff"
+    done
+fi
+
 safe_repo_rm "$CS_TOP_DIR/riak_test"
 $GIT clone -b "$rt_spec" \
     'git@github.com:basho/riak_test.git' "$CS_TOP_DIR/riak_test"
@@ -400,4 +469,67 @@ cat >"$RT_CONFIG" <<EOF
     ]}
 ]}.
 EOF
+
+if [[ -n "$db_alt" ]]
+then
+    cat >>"$RT_CONFIG" <<EOF
+
+{cs_alt_ee, [
+    {build_type,        ee},
+    {flavor,            basic},
+    {build_paths,       [
+        {root,              "$RT_TOP_DIR/riak"},
+        {current,           "$RT_TOP_DIR/riak/$(cut -d. -f1,2 <<<"$db_alt")"},
+        {previous,          "$RT_TOP_DIR/riak/$(cut -d. -f1,2 <<<"$db_prev")"},
+        {ee_root,           "$RT_TOP_DIR/riak_ee"},
+        {ee_current,        "$RT_TOP_DIR/riak_ee/$(cut -d. -f1,2 <<<"$db_alt")"},
+        {ee_previous,       "$RT_TOP_DIR/riak_ee/$(cut -d. -f1,2 <<<"$db_prev")"},
+        {cs_root,           "$RT_TOP_DIR/riak_cs_os"},
+        {cs_current,        "$RT_TOP_DIR/riak_cs_os/$(cut -d. -f1,2 <<<"$cs_vers")"},
+        {cs_previous,       "$RT_TOP_DIR/riak_cs_os/$(cut -d. -f1,2 <<<"$cs_prev")"},
+        {stanchion_root,    "$RT_TOP_DIR/stanchion"},
+        {stanchion_current, "$RT_TOP_DIR/stanchion/$(cut -d. -f1,2 <<<"$st_vers")"},
+        {stanchion_previous,"$RT_TOP_DIR/stanchion/$(cut -d. -f1,2 <<<"$st_prev")"}
+    ]}
+]}.
+
+{cs_alt_ee_mb, [
+    {build_type,        ee},
+    {flavor,            {multibag, disjoint}},
+    {build_paths,       [
+        {root,              "$RT_TOP_DIR/riak"},
+        {current,           "$RT_TOP_DIR/riak/$(cut -d. -f1,2 <<<"$db_alt")"},
+        {previous,          "$RT_TOP_DIR/riak/$(cut -d. -f1,2 <<<"$db_prev")"},
+        {ee_root,           "$RT_TOP_DIR/riak_ee"},
+        {ee_current,        "$RT_TOP_DIR/riak_ee/$(cut -d. -f1,2 <<<"$db_alt")"},
+        {ee_previous,       "$RT_TOP_DIR/riak_ee/$(cut -d. -f1,2 <<<"$db_prev")"},
+        {cs_root,           "$RT_TOP_DIR/riak_cs_os"},
+        {cs_current,        "$RT_TOP_DIR/riak_cs_os/$(cut -d. -f1,2 <<<"$cs_vers")"},
+        {cs_previous,       "$RT_TOP_DIR/riak_cs_os/$(cut -d. -f1,2 <<<"$cs_prev")"},
+        {stanchion_root,    "$RT_TOP_DIR/stanchion"},
+        {stanchion_current, "$RT_TOP_DIR/stanchion/$(cut -d. -f1,2 <<<"$st_vers")"},
+        {stanchion_previous,"$RT_TOP_DIR/stanchion/$(cut -d. -f1,2 <<<"$st_prev")"}
+    ]}
+]}.
+
+{cs_alt_os, [
+    {build_type,        oss},
+    {flavor,            basic},
+    {build_paths,       [
+        {root,              "$RT_TOP_DIR/riak"},
+        {current,           "$RT_TOP_DIR/riak/$(cut -d. -f1,2 <<<"$db_alt")"},
+        {previous,          "$RT_TOP_DIR/riak/$(cut -d. -f1,2 <<<"$db_prev")"},
+        {ee_root,           "$RT_TOP_DIR/riak_ee"},
+        {ee_current,        "$RT_TOP_DIR/riak_ee/$(cut -d. -f1,2 <<<"$db_alt")"},
+        {ee_previous,       "$RT_TOP_DIR/riak_ee/$(cut -d. -f1,2 <<<"$db_prev")"},
+        {cs_root,           "$RT_TOP_DIR/riak_cs_os"},
+        {cs_current,        "$RT_TOP_DIR/riak_cs_os/$(cut -d. -f1,2 <<<"$cs_vers")"},
+        {cs_previous,       "$RT_TOP_DIR/riak_cs_os/$(cut -d. -f1,2 <<<"$cs_prev")"},
+        {stanchion_root,    "$RT_TOP_DIR/stanchion"},
+        {stanchion_current, "$RT_TOP_DIR/stanchion/$(cut -d. -f1,2 <<<"$st_vers")"},
+        {stanchion_previous,"$RT_TOP_DIR/stanchion/$(cut -d. -f1,2 <<<"$st_prev")"}
+    ]}
+]}.
+EOF
+fi
 

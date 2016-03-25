@@ -1,0 +1,403 @@
+#!/bin/bash -e
+
+readonly  cs_vers='2.1'
+readonly  db_vers='2.1'
+readonly  st_vers='2.1'
+
+# change to 'master' once 'basho-trb-node_package-change' is merged
+readonly  rt_spec='basho-trb-node_package-change'
+
+readonly  cs_prev='1.5.4p1'
+readonly  db_prev='1.4.12'
+readonly  st_prev='1.5.0'
+
+readonly  sdir="$(cd "$(dirname "$0")" && pwd)"
+readonly  sname="${0##*/}"
+readonly  spath="$sdir/$sname"
+
+readonly  curr_otp_activate='/opt/basho/otp-16-b10/activate'
+readonly  prev_otp_activate='/opt/basho/otp-15-p1/activate'
+
+readonly  rt_roots='riak riak_ee riak_cs_os riak_cs_ee stanchion'
+readonly  old_srcs='riak riak_ee riak_cs stanchion'
+
+readonly  os_type="$(uname -s)"
+readonly  eq_delim='========================'
+
+case $# in
+    0)
+        if [[ -n "$CS_TOP_DIR" && "$(cd "$CS_TOP_DIR" && pwd)" != "$(pwd)" ]]
+        then
+            echo "$sname: error: too scary - CS_TOP_DIR is set but is not the current directory." >&2
+            exit 1
+        fi
+        ;;
+    1)
+        if [[ ! -d "$1" ]]
+        then
+            echo "$sname: error: '$1' is not a directory." >&2
+            exit 2
+        fi
+        cd "$1"
+        ;;
+    *)
+        echo "Usage: $sname [CS-environment-top-dir]" >&2
+        exit 1
+        ;;
+esac
+
+CS_TOP_DIR="$(pwd)"
+RT_TOP_DIR="$CS_TOP_DIR/rt"
+RT_CONFIG="$CS_TOP_DIR/rt.config"
+
+printf 'You are about to blow away most everything under\n\t%s\n' "$CS_TOP_DIR"
+unset REPLY
+while read -p 'Are you SURE? [y/n]: '
+do
+    case "$REPLY" in
+        [yY]|[yY][eE][sS])
+            break
+            ;;
+        [nN]|[nN][oO])
+            echo 'Destruction cancelled, you wimp'
+            exit 0
+            ;;
+    esac
+done
+
+#
+# environment setup
+#
+if [[ -z "$ECP" ]]
+then
+    if [[ "$os_type" == 'Darwin' ]]
+    then
+        ECP='/bin/cp -pX'
+    else
+        ECP='/bin/cp -p'
+    fi
+    export ECP
+fi
+if [[ -z "$ESED" ]]
+then
+    if [[ "$os_type" == 'Linux' ]]
+    then
+        ESED='/usr/bin/sed -r'
+    else
+        ESED='/usr/bin/sed -E'
+    fi
+    export ESED
+fi
+if [[ -z "$MAKE" ]]
+then
+    case "$os_type" in
+        Darwin|Linux)
+            MAKE="$(type -p /usr/bin/make || true) \
+                $(type -p make || true) $(type -p gmake || true) make"
+            ;;
+        *)
+            MAKE="$(type -p gmake || true) $(type -p make || true) gmake"
+            ;;
+    esac
+    MAKE="${MAKE%% *}"
+    export MAKE
+fi
+if [[ -z "$GIT" ]]
+then
+    GIT="$(type -p git || true) git"
+    GIT="${GIT%% *}"
+    export GIT
+fi
+if [[ -z "$EGREP" ]]
+then
+    EGREP="$(type -p egrep || true) egrep"
+    EGREP="${EGREP%% *}"
+    export EGREP
+fi
+if [[ -z "$LANG" ]]
+then
+    LANG='C'
+    export LANG
+fi
+LDFLAGS='-g -O3'
+case ""$os_type"" in
+    Darwin)
+        LDFLAGS="-arch x86_64 $LDFLAGS"
+        ccands='/usr/bin/cc gcc cc'
+        cccands='/usr/bin/c++ g++ c++'
+        ;;
+    Linux)
+        ccands='gcc cc'
+        cccands='g++ gcc c++'
+        ;;
+    *BSD)
+        ccands='clang39 clang38 clang37 /usr/bin/cc gcc cc'
+        cccands='/usr/bin/c++ g++ c++'
+        ;;
+    *)
+        ccands='cc gcc'
+        cccands='c++ g++ gcc'
+        ;;
+esac
+
+CFLAGS="-m64 -march=native -mcx16 $LDFLAGS"
+CXXFLAGS="$CFLAGS"
+
+for c in icc $ccands $CC
+do
+    CC="$(type -p $c || true)"
+    [[ -z "$CC" ]] || break
+done
+if [[ -z "$CC" ]]
+then
+    echo "$sname: error: no C compiler found!" >&2
+    exit 2
+fi
+if [[ "${CC##*/}" == icc || "${CC##*/}" == clang* ]]
+then
+    CXX="$CC"
+else
+    for c in $cccands $CC
+    do
+        CXX="$(type -p $c || true)"
+        [[ -z "$CXX" ]] || break
+    done
+fi
+unset c ccand cccand
+
+CCC="$CXX"
+CCFLAGS="$CXXFLAGS"
+
+export CC CFLAGS CCC CCFLAGS CXX CXXFLAGS LDFLAGS
+
+unset CPPFLAGS DEVNODES ERL_LIBS MAKEFLAGS RIAK_CS_EE_DEPS
+#
+# environment setup done
+#
+
+#
+# safe_repo_rm fully-qualified-path
+#
+safe_repo_rm()
+{
+    if [[ -d "$1" ]]
+    then
+        if [[ -d "$1/.git" ]]
+        then
+            cd "$1"
+            if $GIT status -s | $EGREP -vq '^\?\?[[:space:]]'
+            then
+                echo "$sname: error: uncomitted changes in '$1'" >&2
+                exit 3
+            fi
+            cd "$CS_TOP_DIR"
+        fi
+        /bin/rm -rf "$1"
+    fi
+}
+
+#
+# init_repo_version repo vers-spec dest-dir
+#
+init_source_repo()
+{
+    printf '%s\n*** Initializing %s ...\n' "$eq_delim" "$3"
+    
+    safe_repo_rm "$3"
+    $GIT clone -b "$2" "git@github.com:basho/$1.git" "$3"
+
+    printf '*** Done.\n%s\n' "$eq_delim"
+}
+
+#
+# init_test_build otp-activate source-dir test-dir
+#
+init_test_build()
+{
+    . "$1"
+
+    cd "$2"
+    printf '%s\n*** Using %s\n*** Building %s ...\n' \
+        "$eq_delim" "$(dirname "$(dirname "$(type -p erl)")")" "$2"
+    
+    if $EGREP -q '^([^#]*[[:space:]:])?stagedevrel[[:space:]:]' Makefile
+    then
+        $MAKE stagedevrel
+    else
+        $MAKE devrel
+    fi
+
+    printf '*** Done.\n%s\n*** Installing %s ...\n' "$eq_delim" "$3"
+
+    /bin/rm -rf "$3"
+    /bin/mkdir -p "$3"
+    $ECP -PR "$2/dev" "$3/dev"
+    $GIT describe --tags >"$3/VERSION"
+    printf '*** Done.\n%s\n' "$eq_delim"
+    cd "$CS_TOP_DIR"
+}
+
+#
+# init_repo_version repo current-version previous-version
+#
+init_repo_version()
+{
+    local repo="$1"
+    local curr_vers="$2"
+    local prev_vers="$3"
+
+    local curr_suff="$(cut -d. -f1,2 <<<"$curr_vers")"
+    local prev_suff="$(cut -d. -f1,2 <<<"$prev_vers")"
+
+    if [[ "$repo" = 'riak' || "$repo" = 'riak_ee' ]]
+    then
+        if [[ -n "$(cut -d. -f3 <<<"$curr_vers")" ]]
+        then
+            local curr_spec="$repo-$curr_vers"
+        else
+            local curr_spec="$curr_vers"
+        fi
+        if [[ -n "$(cut -d. -f3 <<<"$prev_vers")" ]]
+        then
+            local prev_spec="$repo-$prev_vers"
+        else
+            local prev_spec="$prev_vers"
+        fi
+    else
+        local curr_spec="$curr_vers"
+        local prev_spec="$prev_vers"
+    fi
+    local curr_src_dir="$CS_TOP_DIR/$repo-$curr_suff"
+    local prev_src_dir="$CS_TOP_DIR/$repo-$prev_suff"
+
+    if [[ "$repo" = 'riak_cs' ]]
+    then
+        init_source_repo "$repo" "$prev_spec" "$prev_src_dir"
+        init_source_repo "$repo" "$curr_spec" "$curr_src_dir"
+        init_test_build "$prev_otp_activate" "$prev_src_dir" "$RT_TOP_DIR/${repo}_os/$prev_suff"
+        init_test_build "$curr_otp_activate" "$curr_src_dir" "$RT_TOP_DIR/${repo}_os/$curr_suff"
+        export  RIAK_CS_EE_DEPS='true'
+        init_source_repo "$repo" "$prev_spec" "$prev_src_dir"
+        init_source_repo "$repo" "$curr_spec" "$curr_src_dir"
+        init_test_build "$prev_otp_activate" "$prev_src_dir" "$RT_TOP_DIR/${repo}_ee/$prev_suff"
+        init_test_build "$curr_otp_activate" "$curr_src_dir" "$RT_TOP_DIR/${repo}_ee/$curr_suff"
+        unset   RIAK_CS_EE_DEPS
+    else
+        init_source_repo "$repo" "$prev_spec" "$prev_src_dir"
+        init_source_repo "$repo" "$curr_spec" "$curr_src_dir"
+        init_test_build "$prev_otp_activate" "$prev_src_dir" "$RT_TOP_DIR/$repo/$prev_suff"
+        init_test_build "$curr_otp_activate" "$curr_src_dir" "$RT_TOP_DIR/$repo/$curr_suff"
+    fi
+}
+
+if [[ -n "$old_srcs" ]]
+then
+    for dir in $old_srcs
+    do
+        safe_repo_rm "$CS_TOP_DIR/$dir"
+    done
+fi
+
+for dir in $rt_roots
+do
+    [[ -d "$RT_TOP_DIR/$dir/.git" ]] || continue
+    cd "$RT_TOP_DIR/$dir"
+    $GIT reset --hard -q HEAD
+    $GIT clean -f -f -dq
+    /bin/rm -rf "$RT_TOP_DIR/$dir/.git"
+done
+
+init_repo_version riak      "$db_vers" "$db_prev"
+init_repo_version riak_ee   "$db_vers" "$db_prev"
+init_repo_version riak_cs   "$cs_vers" "$cs_prev"
+init_repo_version stanchion "$st_vers" "$st_prev"
+
+safe_repo_rm "$CS_TOP_DIR/riak_test"
+$GIT clone -b "$rt_spec" \
+    'git@github.com:basho/riak_test.git' "$CS_TOP_DIR/riak_test"
+cd "$CS_TOP_DIR/riak_test"
+$MAKE
+
+for dir in $rt_roots
+do
+    [[ -d "$RT_TOP_DIR/$dir" ]] || continue
+    cd "$RT_TOP_DIR/$dir"
+    [[ ! -d current ]] || /bin/rm -rf current
+    $GIT init
+    $GIT add -A *
+    $GIT commit -q -m 'riak_test init'
+done
+
+cd "$CS_TOP_DIR"
+
+CS_SRC_ROOT="$CS_TOP_DIR/riak_cs-$(cut -d. -f1,2 <<<"$cs_vers")"
+cat >"$RT_CONFIG" <<EOF
+%%
+%% riak_test configuration for Riak CS
+%%
+
+{default, [
+    {rt_max_wait_time,  60000},
+    {rt_retry_delay,    500},
+
+    {rt_project,        "riak_cs"},
+    {rt_harness,        rtcs_dev},
+    {rt_deps,           ["$CS_SRC_ROOT/deps"]},
+    {test_paths,        ["$CS_SRC_ROOT/riak_test/ebin"]},
+    {src_paths,         [
+        {cs_src_root,       "$CS_SRC_ROOT"}
+    ]},
+    {build_paths,       [
+        {root,              "$RT_TOP_DIR/riak"},
+        {current,           "$RT_TOP_DIR/riak/$(cut -d. -f1,2 <<<"$db_vers")"},
+        {previous,          "$RT_TOP_DIR/riak/$(cut -d. -f1,2 <<<"$db_prev")"},
+        {ee_root,           "$RT_TOP_DIR/riak_ee"},
+        {ee_current,        "$RT_TOP_DIR/riak_ee/$(cut -d. -f1,2 <<<"$db_vers")"},
+        {ee_previous,       "$RT_TOP_DIR/riak_ee/$(cut -d. -f1,2 <<<"$db_prev")"},
+        {cs_root,           "$RT_TOP_DIR/riak_cs_ee"},
+        {cs_current,        "$RT_TOP_DIR/riak_cs_ee/$(cut -d. -f1,2 <<<"$cs_vers")"},
+        {cs_previous,       "$RT_TOP_DIR/riak_cs_ee/$(cut -d. -f1,2 <<<"$cs_prev")"},
+        {stanchion_root,    "$RT_TOP_DIR/stanchion"},
+        {stanchion_current, "$RT_TOP_DIR/stanchion/$(cut -d. -f1,2 <<<"$st_vers")"},
+        {stanchion_previous,"$RT_TOP_DIR/stanchion/$(cut -d. -f1,2 <<<"$st_prev")"}
+    ]},
+    {lager_level,       debug},
+    {backend,           {multi_backend, bitcask}},
+    %
+    % just so it's fully-formed for when I forget to point at an explicit config
+    % this is effectively the 'cs_ee' configuration
+    %
+    {build_type,        ee},
+    {flavor,            basic}
+]}.
+
+{cs_ee, [
+    {build_type,        ee},
+    {flavor,            basic}
+]}.
+
+{cs_ee_mb, [
+    {build_type,        ee},
+    {flavor,            {multibag, disjoint}}
+]}.
+
+{cs_os, [
+    {build_type,        oss},
+    {flavor,            basic},
+    {build_paths,       [
+        {root,              "$RT_TOP_DIR/riak"},
+        {current,           "$RT_TOP_DIR/riak/$(cut -d. -f1,2 <<<"$db_vers")"},
+        {previous,          "$RT_TOP_DIR/riak/$(cut -d. -f1,2 <<<"$db_prev")"},
+        {ee_root,           "$RT_TOP_DIR/riak_ee"},
+        {ee_current,        "$RT_TOP_DIR/riak_ee/$(cut -d. -f1,2 <<<"$db_vers")"},
+        {ee_previous,       "$RT_TOP_DIR/riak_ee/$(cut -d. -f1,2 <<<"$db_prev")"},
+        {cs_root,           "$RT_TOP_DIR/riak_cs_os"},
+        {cs_current,        "$RT_TOP_DIR/riak_cs_os/$(cut -d. -f1,2 <<<"$cs_vers")"},
+        {cs_previous,       "$RT_TOP_DIR/riak_cs_os/$(cut -d. -f1,2 <<<"$cs_prev")"},
+        {stanchion_root,    "$RT_TOP_DIR/stanchion"},
+        {stanchion_current, "$RT_TOP_DIR/stanchion/$(cut -d. -f1,2 <<<"$st_vers")"},
+        {stanchion_previous,"$RT_TOP_DIR/stanchion/$(cut -d. -f1,2 <<<"$st_prev")"}
+    ]}
+]}.
+EOF
+

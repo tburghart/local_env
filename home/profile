@@ -16,7 +16,7 @@ export BASHO_PRJ_BASE TRB_PRJ_BASE LOCAL_ENV_DIR LOCAL_OTP_DIR
 stype="$(uname -s)"
 mtype="$(uname -m)"
 usern="${LOGNAME:-${USER:-$(id -un)}}"
-unset_vars='stype ntype usern'
+unset_vars='stype mtype usern'
 
 pathbeg='/usr/local /opt/local /usr /opt'
 pathend='/usr/local/cuda /usr/local/mysql'
@@ -102,32 +102,43 @@ done
 PATH="$bpath:$spath"
 export PATH
 
-unset_vars="$unset_vars m"
 case "$stype" in
     Linux | Darwin )
-        m="$(which make) $(which gmake) make"
+        for MAKE in $(which make) $(which gmake) make
+        do break ; done
         ;;
     * )
-        m="$(which gmake) $(which make) make"
+        for MAKE in $(which gmake) $(which make) make
+        do break ; done
         ;;
 esac
-for MAKE in $m ; do break ; done
 export MAKE
 
+ere_flag='-E'
+unset_vars="$unset_vars ere_flag"
+
 ECP='/bin/cp -p'
-ESED='/usr/bin/sed -E'
+ESED="/usr/bin/sed $ere_flag"
 case "$stype" in
     Darwin )
         ECP='/bin/cp -pX'
         ;;
     Linux )
-        ESED='/usr/bin/sed -r'
+        ere_flag='-r'
         ;;
 esac
-export ECP ESED
+if [[ -z "$EGREP" ]]
+then
+    EGREP="$(which egrep)"
+    if [[ -z "$EGREP" ]]
+    then
+        EGREP="$(which grep) $ere_flag"
+    fi
+fi
+export ECP EGREP ESED
 
-for GIT in $(which /usr/bin/git) \
-    $(which /usr/local/bin/git) $(which git) git ; do break ; done
+for GIT in $(which /usr/bin/git) $(which /usr/local/bin/git) $(which git) git
+do break ; done
 export GIT
 
 BLOCKSIZE=K

@@ -1,10 +1,7 @@
 #
 # .shrc - shell startup file 
 #
-if [ -z "$PS1" ]
-then
-    return
-fi
+
 #
 # file permissions: rwxr-xr-x
 #

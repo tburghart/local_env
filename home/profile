@@ -37,6 +37,10 @@ then
         spath="${spath:+${spath}:}$HOME/sbin/OsX"
     fi
 else
+    if [[ "$stype" == 'SunOS' ]]
+    then
+        pathbeg='/usr/local /opt/local /usr/xpg6 /usr/xpg4 /usr /opt'
+    fi
     pathend="/usr/X11R7 /usr/X11R6 $pathend"
     pathadd="$pathadd /usr/bin/X11R7 /usr/bin/X11R6 /usr/bin/X11"
 fi
@@ -108,36 +112,36 @@ case "$stype" in
         do break ; done
         ;;
     * )
-        for MAKE in $(which gmake) $(which make) make
+        for MAKE in $(which gmake) $(which make) gmake
         do break ; done
         ;;
 esac
 export MAKE
 
-ere_flag='-E'
-unset_vars="$unset_vars ere_flag"
-
 ECP='/bin/cp -p'
-ESED="/usr/bin/sed $ere_flag"
+ESED='/usr/bin/sed -E'
 case "$stype" in
     Darwin )
         ECP='/bin/cp -pX'
         ;;
     Linux )
-        ere_flag='-r'
+        ESED='/usr/bin/sed -r'
         ;;
 esac
 if [[ -z "$EGREP" ]]
 then
+    unalias egrep fgrep grep 2>/dev/null
     EGREP="$(which egrep)"
     if [[ -z "$EGREP" ]]
     then
-        EGREP="$(which grep) $ere_flag"
+        for EGREP in $(which grep) grep
+        do break ; done
+        EGREP="$EGREP -E"
     fi
 fi
 export ECP EGREP ESED
 
-for GIT in $(which /usr/bin/git) $(which /usr/local/bin/git) $(which git) git
+for GIT in $(which git) git
 do break ; done
 export GIT
 

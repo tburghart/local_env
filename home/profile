@@ -201,9 +201,14 @@ fi
 
 unset $unset_vars unset_vars 2>/dev/null
 
-if [[ -f "$HOME/.shrc" ]]
-then
-    ENV="$HOME/.shrc"
-    export ENV
-    . "$ENV"
-fi
+for ENV in "$HOME/.shrc" "$LOCAL_ENV_DIR/home/shrc" $ENV
+do
+    if [[ -f "$ENV" ]]
+    then
+        export ENV
+        . "$ENV"
+        # done, get out now to avoid 'unset' below
+        return
+    fi
+done
+unset ENV

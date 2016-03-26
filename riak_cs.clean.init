@@ -1,4 +1,19 @@
 #!/bin/bash -e
+# ========================================================================
+# Copyright (c) 2014-2016 T. R. Burghart.
+# 
+# Permission to use, copy, modify, and/or distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+# 
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+# ========================================================================
 #
 # Script to set up a complete Riak CS development environment.
 #
@@ -484,9 +499,9 @@ then
         {ee_root,           "$RT_TOP_DIR/riak_ee"},
         {ee_current,        "$RT_TOP_DIR/riak_ee/$(cut -d. -f1,2 <<<"$db_alt")"},
         {ee_previous,       "$RT_TOP_DIR/riak_ee/$(cut -d. -f1,2 <<<"$db_prev")"},
-        {cs_root,           "$RT_TOP_DIR/riak_cs_os"},
-        {cs_current,        "$RT_TOP_DIR/riak_cs_os/$(cut -d. -f1,2 <<<"$cs_vers")"},
-        {cs_previous,       "$RT_TOP_DIR/riak_cs_os/$(cut -d. -f1,2 <<<"$cs_prev")"},
+        {cs_root,           "$RT_TOP_DIR/riak_cs_ee"},
+        {cs_current,        "$RT_TOP_DIR/riak_cs_ee/$(cut -d. -f1,2 <<<"$cs_vers")"},
+        {cs_previous,       "$RT_TOP_DIR/riak_cs_ee/$(cut -d. -f1,2 <<<"$cs_prev")"},
         {stanchion_root,    "$RT_TOP_DIR/stanchion"},
         {stanchion_current, "$RT_TOP_DIR/stanchion/$(cut -d. -f1,2 <<<"$st_vers")"},
         {stanchion_previous,"$RT_TOP_DIR/stanchion/$(cut -d. -f1,2 <<<"$st_prev")"}
@@ -503,9 +518,9 @@ then
         {ee_root,           "$RT_TOP_DIR/riak_ee"},
         {ee_current,        "$RT_TOP_DIR/riak_ee/$(cut -d. -f1,2 <<<"$db_alt")"},
         {ee_previous,       "$RT_TOP_DIR/riak_ee/$(cut -d. -f1,2 <<<"$db_prev")"},
-        {cs_root,           "$RT_TOP_DIR/riak_cs_os"},
-        {cs_current,        "$RT_TOP_DIR/riak_cs_os/$(cut -d. -f1,2 <<<"$cs_vers")"},
-        {cs_previous,       "$RT_TOP_DIR/riak_cs_os/$(cut -d. -f1,2 <<<"$cs_prev")"},
+        {cs_root,           "$RT_TOP_DIR/riak_cs_ee"},
+        {cs_current,        "$RT_TOP_DIR/riak_cs_ee/$(cut -d. -f1,2 <<<"$cs_vers")"},
+        {cs_previous,       "$RT_TOP_DIR/riak_cs_ee/$(cut -d. -f1,2 <<<"$cs_prev")"},
         {stanchion_root,    "$RT_TOP_DIR/stanchion"},
         {stanchion_current, "$RT_TOP_DIR/stanchion/$(cut -d. -f1,2 <<<"$st_vers")"},
         {stanchion_previous,"$RT_TOP_DIR/stanchion/$(cut -d. -f1,2 <<<"$st_prev")"}

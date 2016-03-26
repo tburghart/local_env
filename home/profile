@@ -1,6 +1,32 @@
+#!/usr/bin/false This file is meant to be sourced
+# ========================================================================
+# Copyright (c) 1994-2016 T. R. Burghart.
+# 
+# Permission to use, copy, modify, and/or distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+# 
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+# ========================================================================
 #
-# .profile - Shell startup script for login shells
+# .profile - Shell startup script for Bourne-ish login shells
 #
+# Refer to files in https://github.com/tburghart/local_env
+#
+# Install to $HOME/.profile
+#
+
+shome="$HOME"
+stype="$(uname -s)"
+mtype="$(uname -m)"
+usern="${LOGNAME:-${USER:-$(id -un)}}"
+unset_vars='shome stype mtype usern'
 
 BASHO_PRJ_BASE="$HOME/prj/basho"
 TRB_PRJ_BASE="$HOME/prj/tedb"
@@ -12,11 +38,6 @@ do
     if [[ -d "$LOCAL_OTP_DIR" && -w "$LOCAL_OTP_DIR" ]] ; then break ; fi
 done
 export BASHO_PRJ_BASE TRB_PRJ_BASE LOCAL_ENV_DIR LOCAL_OTP_DIR
-
-stype="$(uname -s)"
-mtype="$(uname -m)"
-usern="${LOGNAME:-${USER:-$(id -un)}}"
-unset_vars='stype mtype usern'
 
 pathbeg='/usr/local /opt/local /usr /opt'
 pathend='/usr/local/cuda /usr/local/mysql'
@@ -172,6 +193,12 @@ P4EDITOR="$VISUAL"
 WINEDITOR="$VISUAL"
 export VISUAL P4EDITOR WINEDITOR
 
+# in case $HOME is changed along the way ...
+if [[ "$HOME" != "$shome" ]]
+then
+    cd "$HOME"
+fi
+
 unset $unset_vars unset_vars 2>/dev/null
 
 if [[ -f "$HOME/.shrc" ]]
@@ -180,6 +207,3 @@ then
     export ENV
     . "$ENV"
 fi
-
-# in case $HOME is changed along the way ...
-cd "$HOME"

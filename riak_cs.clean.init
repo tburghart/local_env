@@ -21,10 +21,10 @@
 # you confirm it can do a LOT of damage, so be sure!
 #
 # Errors:
-#   If any command experiences an error, the script will stop dead wherever
+# - If any command experiences an error, the script will stop dead wherever
 #   it is and exit. It has no recovery capability, so it goes through the
 #   entire sequence on every run, by design.
-#   Other than command errors, the other thing that will stop it short of
+# - Other than command errors, the other thing that will stop it short of
 #   completion is an existing target source directory that contains uncommitted
 #   changes, but it may do a lot of work before it gets to it, so you're wise
 #   to confirm beforehand.
@@ -36,6 +36,14 @@
 #   'prev_otp_activate' paths.
 # - Unless you're planning to go overboard on testing, you'll probably
 #   want to unset 'db_alt'.
+#
+# Programming:
+# - The script relies heavily on the '-e' option in the interpreter directive
+#   to bail out at the first hint of trouble. If you run explicitly under the
+#   shell, such as for tracing/debugging, be sure to include it on your
+#   command line.
+# - Variables with very short names should never be counted on outside the
+#   block where they're used.
 #
 
 #
@@ -91,50 +99,19 @@ readonly  eq_delim='========================'
 readonly  os_type="$(uname -s)"
 readonly  rt_roots='riak riak_ee riak_cs_os riak_cs_ee stanchion'
 
-case $# in
-    0)
-        if [[ -n "$CS_TOP_DIR" && "$(cd "$CS_TOP_DIR" && pwd)" != "$(pwd)" ]]
-        then
-            echo "$sname: error: too scary - CS_TOP_DIR is set but is not the current directory." >&2
-            exit 1
-        fi
-        ;;
-    1)
-        if [[ ! -d "$1" ]]
-        then
-            echo "$sname: error: '$1' is not a directory." >&2
-            exit 2
-        fi
-        cd "$1"
-        ;;
-    *)
-        echo "Usage: $sname [CS-environment-top-dir]" >&2
-        exit 1
-        ;;
-esac
-
-CS_TOP_DIR="$(pwd)"
-RT_TOP_DIR="$CS_TOP_DIR/rt"
-RT_CONFIG="$CS_TOP_DIR/rt.config"
-
-printf 'You are about to blow away most everything under\n\t%s\n' "$CS_TOP_DIR"
-unset REPLY
-while read -p 'Are you SURE? [y/n]: '
-do
-    case "$REPLY" in
-        [yY]|[yY][eE][sS])
-            break
-            ;;
-        [nN]|[nN][oO])
-            echo 'Destruction cancelled, you wimp'
-            exit 0
-            ;;
-    esac
-done
-
 #
-# environment setup
+# make sure we have some tools working the way we expect before bugging
+# the user about whether they want to proceed
 #
+
+# start by making sure they're not aliases, because they wreak havoc
+# on trying to find actual executable programs
+unalias egrep git gmake make 2>/dev/null || true
+unalias cc clang c++ gcc g++ icc 2>/dev/null || true
+
+export_vars='LANG'
+[[ -n "$LANG" ]] || LANG='C'
+export_vars+=' EGREP'
 if [[ -z "$ECP" ]]
 then
     if [[ "$os_type" == 'Darwin' ]]
@@ -143,8 +120,10 @@ then
     else
         ECP='/bin/cp -p'
     fi
-    export ECP
 fi
+export_vars+=' EGREP'
+[[ -n "$EGREP" ]] || EGREP="$(type -p egrep || echo egrep)"
+export_vars+=' ESED'
 if [[ -z "$ESED" ]]
 then
     if [[ "$os_type" == 'Linux' ]]
@@ -153,40 +132,23 @@ then
     else
         ESED='/usr/bin/sed -E'
     fi
-    export ESED
 fi
+export_vars+=' GIT'
+[[ -n "$GIT" ]] || GIT="$(type -p git || echo git)"
+export_vars+=' MAKE'
 if [[ -z "$MAKE" ]]
 then
     case "$os_type" in
         Darwin|Linux)
-            MAKE="$(type -p /usr/bin/make || true) \
-                $(type -p make || true) $(type -p gmake || true) make"
+            MAKE="$(type -p /usr/bin/make \
+                || type -p make || type -p gmake || echo make)"
             ;;
         *)
-            MAKE="$(type -p gmake || true) $(type -p make || true) gmake"
+            MAKE="$(type -p gmake || type -p make || echo gmake)"
             ;;
     esac
-    MAKE="${MAKE%% *}"
-    export MAKE
 fi
-if [[ -z "$GIT" ]]
-then
-    GIT="$(type -p git || true) git"
-    GIT="${GIT%% *}"
-    export GIT
-fi
-if [[ -z "$EGREP" ]]
-then
-    unalias egrep 2>/dev/null || true
-    EGREP="$(type -p egrep || true) egrep"
-    EGREP="${EGREP%% *}"
-    export EGREP
-fi
-if [[ -z "$LANG" ]]
-then
-    LANG='C'
-    export LANG
-fi
+export_vars+=' LDFLAGS'
 LDFLAGS='-g -O3'
 case ""$os_type"" in
     Darwin)
@@ -208,6 +170,7 @@ case ""$os_type"" in
         ;;
 esac
 
+export_vars+=' CFLAGS CXXFLAGS'
 CFLAGS="-m64 -march=native -mcx16 $LDFLAGS"
 CXXFLAGS="$CFLAGS"
 
@@ -221,6 +184,7 @@ then
     echo "$sname: error: no C compiler found!" >&2
     exit 2
 fi
+export_vars+=' CC CXX'
 if [[ "${CC##*/}" == icc || "${CC##*/}" == clang* ]]
 then
     CXX="$CC"
@@ -233,15 +197,133 @@ else
 fi
 unset c ccand cccand
 
+export_vars+=' CCC CCFLAGS'
 CCC="$CXX"
 CCFLAGS="$CXXFLAGS"
 
-export CC CFLAGS CCC CCFLAGS CXX CXXFLAGS LDFLAGS
+export  $export_vars
+unset   CPPFLAGS DEVNODES ERL_LIBS LD MAKEFLAGS RIAK_CS_EE_DEPS
 
-unset CPPFLAGS DEVNODES ERL_LIBS MAKEFLAGS RIAK_CS_EE_DEPS
+# display what we'll be using
+echo $eq_delim
+echo \* Relevant Environment:
+env | $EGREP "^(${export_vars// /|}|PATH|LC_CTYPE)=" | sort
+
+unset export_vars
 #
 # environment setup done
 #
+
+#
+# make sure the kerl-ish 'activate' scripts are present, working, and the
+# right versions before harrassing the user about whether to continue
+# tell them all their problems up front
+#
+echo $eq_delim
+err=0
+for rec in "15/$prev_otp_activate"  "16/$curr_otp_activate"
+do
+    act="${rec#*/}"
+    ver="${rec%%/*}"
+    if [[ $ver -eq 15 ]]
+    then
+        csn="Riak CS $(cut -d. -f1,2 <<<"$cs_prev")"
+    else
+        csn="Riak CS $(cut -d. -f1,2 <<<"$cs_vers")"
+    fi
+    if [[ ! -f "$act" ]]
+    then
+        echo "$sname: error: '$act' not found" >&2
+        err=2
+    elif ! . "$act"
+    then
+        echo "$sname: error: '$act' didn't load successfully" >&2
+        err=2
+    else
+        rel="$(erl -noshell -eval \
+            'erlang:display(erlang:system_info(otp_release)), halt().' | \
+            /usr/bin/cut '-d"' -f2)"
+        case "$ver/$rel" in
+            15/R15B01|15/R15B0[23]*|16/R16B0[23]_basho1[0-9])
+                echo \* $csn will use $rel
+                ;;
+            16/R16B02_basho[789])
+                echo \* $csn will use $rel
+                echo \* R16B02_basho10 or above is recommended.
+                ;;
+            16/R16B0[23]|16/R16B03-1)
+                echo \* $csn will use $rel
+                echo \* This should work, \
+                    but R16B02_basho10 or above is recommended.
+                ;;
+            15/*)
+                echo $sname: error: $csn does not support $rel >&2
+                [[ "$rel" == R15B01?* ]] || \
+                    echo \* Use R15 at R15B01 or above. >&2
+                echo \* Releases of R15B01 with a suffix cause the version \
+                    of webmachine used by $csn to build incorrectly. >&2
+                echo \* To use a Basho version of R15, use \
+                    basho_OTP_R15B01p, NOT the head of the basho-otp-15 \
+                    branch or OTP_R15B01_basho1. >&2
+                err=2
+                ;;
+            16/*)
+                echo $sname: error: $csn does not support $rel >&2
+                echo \* R16 at R16B02_basho10 or above is recommended. >&2
+                err=2
+                ;;
+        esac
+    fi
+done
+# if this is going to cause a problem, let it kill the script now
+kerl_deactivate
+[[ $err -eq 0 ]] || exit $err
+unset act csn err rel ver
+
+case $# in
+    0)
+        if [[ -n "$CS_TOP_DIR" && "$(cd "$CS_TOP_DIR" && pwd)" != "$(pwd)" ]]
+        then
+            echo $sname: error: too scary - \
+                CS_TOP_DIR is set but is not the current directory. >&2
+            exit 1
+        fi
+        ;;
+    1)
+        if [[ ! -d "$1" ]]
+        then
+            echo "$sname: error: '$1' is not a directory." >&2
+            exit 2
+        fi
+        cd "$1"
+        ;;
+    *)
+        echo "Usage: $sname [CS-environment-top-dir]" >&2
+        exit 1
+        ;;
+esac
+
+CS_TOP_DIR="$(pwd)"
+RT_TOP_DIR="$CS_TOP_DIR/rt"
+RT_CONFIG="$CS_TOP_DIR/rt.config"
+
+echo $eq_delim
+printf 'You are about to blow away most everything under\n\t%s\n' "$CS_TOP_DIR"
+unset REPLY
+while read -p 'Are you SURE? [y/n]: '
+do
+    case "$REPLY" in
+        [yY]|[yY][eE][sS])
+            break
+            ;;
+        [nN]|[nN][oO])
+            echo 'Destruction cancelled, you wimp'
+            exit 0
+            ;;
+    esac
+done
+echo Ok, then ...
+echo $eq_delim
 
 #
 # safe_repo_rm fully-qualified-path
@@ -485,9 +567,9 @@ cat >"$RT_CONFIG" <<EOF
 ]}.
 EOF
 
-if [[ -n "$db_alt" ]]
-then
-    cat >>"$RT_CONFIG" <<EOF
+[[ -n "$db_alt" ]] || exit 0
+
+cat >>"$RT_CONFIG" <<EOF
 
 {cs_alt_ee, [
     {build_type,        ee},
@@ -546,5 +628,3 @@ then
     ]}
 ]}.
 EOF
-fi
-

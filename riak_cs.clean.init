@@ -45,10 +45,19 @@
 # - Variables with very short names should never be counted on outside the
 #   block where they're used.
 #
+# ToDo:
+# - Maybe support strictly open-source builds at some point, so people outside
+#   Basho can use it. Not a high priority while I work for Basho ;)
+#
 
 #
-# current and previous versions for testing
-# these will all be built locally
+# Current and previous versions for testing.
+# These will all be built locally.
+# Generally, X.Y is interpretted as a branch, and X.Y.Z... is interpretted as
+# a tag. This matters for riak[_ee], where tags get the repo name prefixed.
+# Note that versions with a non-numeric character immediately following a '.'
+# have the potential to wreak havoc on directory names - hopefully these will
+# never occur in Basho repos.
 #
 readonly  cs_vers='2.1'
 readonly  db_vers='2.1'
@@ -59,20 +68,29 @@ readonly  db_prev='1.4.12'
 readonly  st_prev='1.5.0'
 
 #
-# if "$db_alt" is set, it should refer to another version of Riak [EE] that's
-# [mostly] compatible with CS version $cs_vers, to be used for testing
+# If "$db_alt" is set, it should refer to another version of Riak [EE] that's
+# [mostly] compatible with CS version $cs_vers, to be used for testing.
 #
 readonly  db_alt='2.0'
 
 #
-# change to 'master' once 'basho-trb-node_package-change' is merged
-# it would be nice to match this to the Riak version, but the CS harness
-# uses features only in the master branch as of now
+# How many elements of a repo's version to use as a directory name suffix.
+# Leading 'xxx-' and trailing non-numeric characters are stripped, so if
+# "$xy_vers" == 'xytag-3.4.5rc6' and "$suffix_elems" == '3', the result of
+# `vers_suffix $xy_vers` would be '3.4.5'. If you want some other
+# transformation, you'll have to edit the vers_suffix() function definition.
+#
+readonly  suffix_elems=2
+
+#
+# Change to 'master' once 'basho-trb-node_package-change' is merged.
+# It would be nice to match this to the Riak version, but the CS harness
+# uses features only in the master branch as of now.
 #
 readonly  rt_spec='basho-trb-node_package-change'
 
 #
-# which OTP builds to use
+# Which OTP builds to use.
 # Note that webmachine breaks if you build the 'previous' OTP from either
 # the OTP_R15B01_basho1 tag or the head of the basho-otp-15 branch, use tag
 # basho_OTP_R15B01p instead.
@@ -81,27 +99,40 @@ readonly  curr_otp_activate='/opt/basho/otp-16-b10/activate'
 readonly  prev_otp_activate='/opt/basho/otp-15-p1/activate'
 
 #
-# old source directories that will be DELETED ENTIRELY if found
+# Old source directories that will be DELETED ENTIRELY if found.
 #
 readonly  old_srcs='riak riak_ee riak_cs stanchion'
 
 #
-# about this script
+# About this script.
 #
 readonly  sdir="$(cd "$(dirname "$0")" && pwd)"
 readonly  sname="${0##*/}"
 readonly  spath="$sdir/$sname"
 
 #
-# assorted constants
+# Assorted constants.
 #
 readonly  eq_delim='========================'
 readonly  os_type="$(uname -s)"
 readonly  rt_roots='riak riak_ee riak_cs_os riak_cs_ee stanchion'
 
 #
-# make sure we have some tools working the way we expect before bugging
-# the user about whether they want to proceed
+# Unset some variables that could alter expected behavior.
+# Some of these could potentially be set to known values later.
+# Keep track of what we want to export/display before the user confirms.
+# 'display_vars' are whitespace-separated EREs and should contain at least
+# everything unset below.
+# 'export_vars' can only be whitespace-separeated whole variable names.
+#
+unset CPPFLAGS DEVNODES ERL_LIBS MAKEFLAGS RIAK_CS_EE_DEPS
+display_vars='CPPFLAGS DEVNODES ERL_LIBS MAKEFLAGS RIAK_CS_EE_DEPS'
+display_vars+=' LANG LC_[[:alnum:]_]+ LD PATH'
+export_vars=''
+
+#
+# Make sure we have some tools working the way we expect before bugging
+# the user about whether they want to proceed.
 #
 
 # start by making sure they're not aliases, because they wreak havoc
@@ -109,9 +140,8 @@ readonly  rt_roots='riak riak_ee riak_cs_os riak_cs_ee stanchion'
 unalias egrep git gmake make 2>/dev/null || true
 unalias cc clang c++ gcc g++ icc 2>/dev/null || true
 
-export_vars='LANG'
 [[ -n "$LANG" ]] || LANG='C'
-export_vars+=' EGREP'
+export_vars+=' LANG'
 if [[ -z "$ECP" ]]
 then
     if [[ "$os_type" == 'Darwin' ]]
@@ -121,9 +151,9 @@ then
         ECP='/bin/cp -p'
     fi
 fi
-export_vars+=' EGREP'
+export_vars+=' ECP'
 [[ -n "$EGREP" ]] || EGREP="$(type -p egrep || echo egrep)"
-export_vars+=' ESED'
+export_vars+=' EGREP'
 if [[ -z "$ESED" ]]
 then
     if [[ "$os_type" == 'Linux' ]]
@@ -133,9 +163,9 @@ then
         ESED='/usr/bin/sed -E'
     fi
 fi
-export_vars+=' GIT'
+export_vars+=' ESED'
 [[ -n "$GIT" ]] || GIT="$(type -p git || echo git)"
-export_vars+=' MAKE'
+export_vars+=' GIT'
 if [[ -z "$MAKE" ]]
 then
     case "$os_type" in
@@ -148,8 +178,10 @@ then
             ;;
     esac
 fi
-export_vars+=' LDFLAGS'
+export_vars+=' MAKE'
+
 LDFLAGS='-g -O3'
+export_vars+=' LDFLAGS'
 case ""$os_type"" in
     Darwin)
         LDFLAGS="-arch x86_64 $LDFLAGS"
@@ -170,9 +202,9 @@ case ""$os_type"" in
         ;;
 esac
 
-export_vars+=' CFLAGS CXXFLAGS'
 CFLAGS="-m64 -march=native -mcx16 $LDFLAGS"
 CXXFLAGS="$CFLAGS"
+export_vars+=' CFLAGS CXXFLAGS'
 
 for c in icc $ccands $CC
 do
@@ -197,27 +229,54 @@ else
 fi
 unset c ccand cccand
 
-export_vars+=' CCC CCFLAGS'
 CCC="$CXX"
 CCFLAGS="$CXXFLAGS"
+export_vars+=' CCC CCFLAGS'
+
+# clean up before using them so the substitutions to make them into an ERE
+# do the right thing
+while [[ "$display_vars" == \ * || "$display_vars" == *\  ]]
+do
+    display_vars="${display_vars# }"
+    display_vars="${display_vars% }"
+done
+while [[ "$export_vars" == \ * || "$export_vars" == *\  ]]
+do
+    export_vars="${export_vars# }"
+    export_vars="${export_vars% }"
+done
 
 export  $export_vars
-unset   CPPFLAGS DEVNODES ERL_LIBS LD MAKEFLAGS RIAK_CS_EE_DEPS
 
 # display what we'll be using
 echo $eq_delim
 echo \* Relevant Environment:
-env | $EGREP "^(${export_vars// /|}|PATH|LC_CTYPE)=" | sort
+env | $EGREP "^(${display_vars// /|}|${export_vars// /|})=" | sort
 
-unset export_vars
+unset display_vars export_vars
 #
 # environment setup done
 #
 
 #
-# make sure the kerl-ish 'activate' scripts are present, working, and the
-# right versions before harrassing the user about whether to continue
-# tell them all their problems up front
+# common operations on tag/branch/version identifiers
+#
+is_tag()
+{
+    [[ -n "$(cut -d. -f3 <<<"$1")" ]]
+}
+vers_suffix()
+{
+    local ver="$(cut -d. -f1-$suffix_elems <<<"${1#*-}")"
+    # if the last element doesn't start with a number, the result is going to
+    # be funky, but that would mean the version was pretty bogus to start with
+    echo "${ver%%[^0-9]*}"
+}
+
+#
+# Make sure the kerl-ish 'activate' scripts are present, working, and the
+# right versions before harrassing the user about whether to continue.
+# Tell them all their problems up front.
 #
 echo $eq_delim
 err=0
@@ -227,9 +286,9 @@ do
     ver="${rec%%/*}"
     if [[ $ver -eq 15 ]]
     then
-        csn="Riak CS $(cut -d. -f1,2 <<<"$cs_prev")"
+        csn="Riak CS $(vers_suffix "$cs_prev")"
     else
-        csn="Riak CS $(cut -d. -f1,2 <<<"$cs_vers")"
+        csn="Riak CS $(vers_suffix "$cs_vers")"
     fi
     if [[ ! -f "$act" ]]
     then
@@ -330,31 +389,50 @@ echo $eq_delim
 #
 safe_repo_rm()
 {
-    if [[ -d "$1" ]]
+    local dir="$1"
+
+    if [[ -d "$dir" ]]
     then
-        if [[ -d "$1/.git" ]]
+        if [[ -d "$dir/.git" ]]
         then
-            cd "$1"
-            if $GIT status -s | $EGREP -vq '^\?\?[[:space:]]'
+            cd "$dir"
+            if [[ $($GIT status -s | wc -l) -ne 0 ]]
             then
-                echo "$sname: error: uncomitted changes in '$1'" >&2
+                echo "$sname: error: uncomitted changes in '$dir'" >&2
                 exit 3
             fi
             cd "$CS_TOP_DIR"
         fi
-        /bin/rm -rf "$1"
+        /bin/rm -rf "$dir"
     fi
 }
 
 #
-# init_repo_version repo vers-spec dest-dir
+# init_repo_version otp-activate repo vers-spec dest-dir
 #
 init_source_repo()
 {
-    printf '%s\n*** Initializing %s ...\n' "$eq_delim" "$3"
+    local act="$1"
+    local rep="$2"
+    local ver="$3"
+    local dir="$4"
+
+    printf '%s\n*** Initializing %s ...\n' "$eq_delim" "$dir"
     
-    safe_repo_rm "$3"
-    $GIT clone -b "$2" "git@github.com:basho/$1.git" "$3"
+    cd "$CS_TOP_DIR"
+    safe_repo_rm "$dir"
+    $GIT clone -b "$ver" "git@github.com:basho/$rep.git" "$dir"
+
+    . "$act"
+    cd "$dir"
+    if is_tag "$ver" \
+    && $EGREP -q '^[[:space:]]*locked-deps[[:space:]:]' Makefile
+    then
+        $MAKE locked-deps
+    else
+        $MAKE deps
+    fi
+    cd "$CS_TOP_DIR"
 
     printf '*** Done.\n%s\n' "$eq_delim"
 }
@@ -364,11 +442,15 @@ init_source_repo()
 #
 init_test_build()
 {
-    . "$1"
+    local act="$1"
+    local src="$2"
+    local tst="$3"
 
-    cd "$2"
+    . "$act"
+    cd "$src"
+
     printf '%s\n*** Using %s\n*** Building %s ...\n' \
-        "$eq_delim" "$(dirname "$(dirname "$(type -p erl)")")" "$2"
+        "$eq_delim" "$(dirname "$(dirname "$(type -p erl)")")" "$src"
     
     if $EGREP -q '^([^#]*[[:space:]:])?stagedevrel[[:space:]:]' Makefile
     then
@@ -377,12 +459,13 @@ init_test_build()
         $MAKE devrel
     fi
 
-    printf '*** Done.\n%s\n*** Installing %s ...\n' "$eq_delim" "$3"
+    printf '*** Done.\n%s\n*** Installing %s ...\n' "$eq_delim" "$tst"
 
-    /bin/rm -rf "$3"
-    /bin/mkdir -p "$3"
-    $ECP -PR "$2/dev" "$3/dev"
-    $GIT describe --tags >"$3/VERSION"
+    /bin/rm -rf "$tst"
+    /bin/mkdir -p "$tst"
+    $ECP -PR "$src/dev" "$tst/dev"
+    $GIT describe --tags >"$tst/VERSION"
+
     printf '*** Done.\n%s\n' "$eq_delim"
     cd "$CS_TOP_DIR"
 }
@@ -396,18 +479,18 @@ init_repo_version()
     local curr_vers="$2"
     local prev_vers="$3"
 
-    local curr_suff="$(cut -d. -f1,2 <<<"$curr_vers")"
-    local prev_suff="$(cut -d. -f1,2 <<<"$prev_vers")"
+    local curr_suff="$(vers_suffix "$curr_vers")"
+    local prev_suff="$(vers_suffix "$prev_vers")"
 
     if [[ "$repo" = 'riak' || "$repo" = 'riak_ee' ]]
     then
-        if [[ -n "$(cut -d. -f3 <<<"$curr_vers")" ]]
+        if is_tag "$curr_vers"
         then
             local curr_spec="$repo-$curr_vers"
         else
             local curr_spec="$curr_vers"
         fi
-        if [[ -n "$(cut -d. -f3 <<<"$prev_vers")" ]]
+        if is_tag "$prev_vers"
         then
             local prev_spec="$repo-$prev_vers"
         else
@@ -496,7 +579,7 @@ done
 
 cd "$CS_TOP_DIR"
 
-CS_SRC_ROOT="$CS_TOP_DIR/riak_cs-$(cut -d. -f1,2 <<<"$cs_vers")"
+CS_SRC_ROOT="$CS_TOP_DIR/riak_cs-$(vers_suffix "$cs_vers")"
 cat >"$RT_CONFIG" <<EOF
 %%
 %% riak_test configuration for Riak CS
@@ -515,17 +598,17 @@ cat >"$RT_CONFIG" <<EOF
     ]},
     {build_paths,       [
         {root,              "$RT_TOP_DIR/riak"},
-        {current,           "$RT_TOP_DIR/riak/$(cut -d. -f1,2 <<<"$db_vers")"},
-        {previous,          "$RT_TOP_DIR/riak/$(cut -d. -f1,2 <<<"$db_prev")"},
+        {current,           "$RT_TOP_DIR/riak/$(vers_suffix "$db_vers")"},
+        {previous,          "$RT_TOP_DIR/riak/$(vers_suffix "$db_prev")"},
         {ee_root,           "$RT_TOP_DIR/riak_ee"},
-        {ee_current,        "$RT_TOP_DIR/riak_ee/$(cut -d. -f1,2 <<<"$db_vers")"},
-        {ee_previous,       "$RT_TOP_DIR/riak_ee/$(cut -d. -f1,2 <<<"$db_prev")"},
+        {ee_current,        "$RT_TOP_DIR/riak_ee/$(vers_suffix "$db_vers")"},
+        {ee_previous,       "$RT_TOP_DIR/riak_ee/$(vers_suffix "$db_prev")"},
         {cs_root,           "$RT_TOP_DIR/riak_cs_ee"},
-        {cs_current,        "$RT_TOP_DIR/riak_cs_ee/$(cut -d. -f1,2 <<<"$cs_vers")"},
-        {cs_previous,       "$RT_TOP_DIR/riak_cs_ee/$(cut -d. -f1,2 <<<"$cs_prev")"},
+        {cs_current,        "$RT_TOP_DIR/riak_cs_ee/$(vers_suffix "$cs_vers")"},
+        {cs_previous,       "$RT_TOP_DIR/riak_cs_ee/$(vers_suffix "$cs_prev")"},
         {stanchion_root,    "$RT_TOP_DIR/stanchion"},
-        {stanchion_current, "$RT_TOP_DIR/stanchion/$(cut -d. -f1,2 <<<"$st_vers")"},
-        {stanchion_previous,"$RT_TOP_DIR/stanchion/$(cut -d. -f1,2 <<<"$st_prev")"}
+        {stanchion_current, "$RT_TOP_DIR/stanchion/$(vers_suffix "$st_vers")"},
+        {stanchion_previous,"$RT_TOP_DIR/stanchion/$(vers_suffix "$st_prev")"}
     ]},
     {lager_level,       debug},
     {backend,           {multi_backend, bitcask}},
@@ -552,17 +635,17 @@ cat >"$RT_CONFIG" <<EOF
     {flavor,            basic},
     {build_paths,       [
         {root,              "$RT_TOP_DIR/riak"},
-        {current,           "$RT_TOP_DIR/riak/$(cut -d. -f1,2 <<<"$db_vers")"},
-        {previous,          "$RT_TOP_DIR/riak/$(cut -d. -f1,2 <<<"$db_prev")"},
+        {current,           "$RT_TOP_DIR/riak/$(vers_suffix "$db_vers")"},
+        {previous,          "$RT_TOP_DIR/riak/$(vers_suffix "$db_prev")"},
         {ee_root,           "$RT_TOP_DIR/riak_ee"},
-        {ee_current,        "$RT_TOP_DIR/riak_ee/$(cut -d. -f1,2 <<<"$db_vers")"},
-        {ee_previous,       "$RT_TOP_DIR/riak_ee/$(cut -d. -f1,2 <<<"$db_prev")"},
+        {ee_current,        "$RT_TOP_DIR/riak_ee/$(vers_suffix "$db_vers")"},
+        {ee_previous,       "$RT_TOP_DIR/riak_ee/$(vers_suffix "$db_prev")"},
         {cs_root,           "$RT_TOP_DIR/riak_cs_os"},
-        {cs_current,        "$RT_TOP_DIR/riak_cs_os/$(cut -d. -f1,2 <<<"$cs_vers")"},
-        {cs_previous,       "$RT_TOP_DIR/riak_cs_os/$(cut -d. -f1,2 <<<"$cs_prev")"},
+        {cs_current,        "$RT_TOP_DIR/riak_cs_os/$(vers_suffix "$cs_vers")"},
+        {cs_previous,       "$RT_TOP_DIR/riak_cs_os/$(vers_suffix "$cs_prev")"},
         {stanchion_root,    "$RT_TOP_DIR/stanchion"},
-        {stanchion_current, "$RT_TOP_DIR/stanchion/$(cut -d. -f1,2 <<<"$st_vers")"},
-        {stanchion_previous,"$RT_TOP_DIR/stanchion/$(cut -d. -f1,2 <<<"$st_prev")"}
+        {stanchion_current, "$RT_TOP_DIR/stanchion/$(vers_suffix "$st_vers")"},
+        {stanchion_previous,"$RT_TOP_DIR/stanchion/$(vers_suffix "$st_prev")"}
     ]}
 ]}.
 EOF
@@ -576,17 +659,17 @@ cat >>"$RT_CONFIG" <<EOF
     {flavor,            basic},
     {build_paths,       [
         {root,              "$RT_TOP_DIR/riak"},
-        {current,           "$RT_TOP_DIR/riak/$(cut -d. -f1,2 <<<"$db_alt")"},
-        {previous,          "$RT_TOP_DIR/riak/$(cut -d. -f1,2 <<<"$db_prev")"},
+        {current,           "$RT_TOP_DIR/riak/$(vers_suffix "$db_alt")"},
+        {previous,          "$RT_TOP_DIR/riak/$(vers_suffix "$db_prev")"},
         {ee_root,           "$RT_TOP_DIR/riak_ee"},
-        {ee_current,        "$RT_TOP_DIR/riak_ee/$(cut -d. -f1,2 <<<"$db_alt")"},
-        {ee_previous,       "$RT_TOP_DIR/riak_ee/$(cut -d. -f1,2 <<<"$db_prev")"},
+        {ee_current,        "$RT_TOP_DIR/riak_ee/$(vers_suffix "$db_alt")"},
+        {ee_previous,       "$RT_TOP_DIR/riak_ee/$(vers_suffix "$db_prev")"},
         {cs_root,           "$RT_TOP_DIR/riak_cs_ee"},
-        {cs_current,        "$RT_TOP_DIR/riak_cs_ee/$(cut -d. -f1,2 <<<"$cs_vers")"},
-        {cs_previous,       "$RT_TOP_DIR/riak_cs_ee/$(cut -d. -f1,2 <<<"$cs_prev")"},
+        {cs_current,        "$RT_TOP_DIR/riak_cs_ee/$(vers_suffix "$cs_vers")"},
+        {cs_previous,       "$RT_TOP_DIR/riak_cs_ee/$(vers_suffix "$cs_prev")"},
         {stanchion_root,    "$RT_TOP_DIR/stanchion"},
-        {stanchion_current, "$RT_TOP_DIR/stanchion/$(cut -d. -f1,2 <<<"$st_vers")"},
-        {stanchion_previous,"$RT_TOP_DIR/stanchion/$(cut -d. -f1,2 <<<"$st_prev")"}
+        {stanchion_current, "$RT_TOP_DIR/stanchion/$(vers_suffix "$st_vers")"},
+        {stanchion_previous,"$RT_TOP_DIR/stanchion/$(vers_suffix "$st_prev")"}
     ]}
 ]}.
 
@@ -595,17 +678,17 @@ cat >>"$RT_CONFIG" <<EOF
     {flavor,            {multibag, disjoint}},
     {build_paths,       [
         {root,              "$RT_TOP_DIR/riak"},
-        {current,           "$RT_TOP_DIR/riak/$(cut -d. -f1,2 <<<"$db_alt")"},
-        {previous,          "$RT_TOP_DIR/riak/$(cut -d. -f1,2 <<<"$db_prev")"},
+        {current,           "$RT_TOP_DIR/riak/$(vers_suffix "$db_alt")"},
+        {previous,          "$RT_TOP_DIR/riak/$(vers_suffix "$db_prev")"},
         {ee_root,           "$RT_TOP_DIR/riak_ee"},
-        {ee_current,        "$RT_TOP_DIR/riak_ee/$(cut -d. -f1,2 <<<"$db_alt")"},
-        {ee_previous,       "$RT_TOP_DIR/riak_ee/$(cut -d. -f1,2 <<<"$db_prev")"},
+        {ee_current,        "$RT_TOP_DIR/riak_ee/$(vers_suffix "$db_alt")"},
+        {ee_previous,       "$RT_TOP_DIR/riak_ee/$(vers_suffix "$db_prev")"},
         {cs_root,           "$RT_TOP_DIR/riak_cs_ee"},
-        {cs_current,        "$RT_TOP_DIR/riak_cs_ee/$(cut -d. -f1,2 <<<"$cs_vers")"},
-        {cs_previous,       "$RT_TOP_DIR/riak_cs_ee/$(cut -d. -f1,2 <<<"$cs_prev")"},
+        {cs_current,        "$RT_TOP_DIR/riak_cs_ee/$(vers_suffix "$cs_vers")"},
+        {cs_previous,       "$RT_TOP_DIR/riak_cs_ee/$(vers_suffix "$cs_prev")"},
         {stanchion_root,    "$RT_TOP_DIR/stanchion"},
-        {stanchion_current, "$RT_TOP_DIR/stanchion/$(cut -d. -f1,2 <<<"$st_vers")"},
-        {stanchion_previous,"$RT_TOP_DIR/stanchion/$(cut -d. -f1,2 <<<"$st_prev")"}
+        {stanchion_current, "$RT_TOP_DIR/stanchion/$(vers_suffix "$st_vers")"},
+        {stanchion_previous,"$RT_TOP_DIR/stanchion/$(vers_suffix "$st_prev")"}
     ]}
 ]}.
 
@@ -614,17 +697,17 @@ cat >>"$RT_CONFIG" <<EOF
     {flavor,            basic},
     {build_paths,       [
         {root,              "$RT_TOP_DIR/riak"},
-        {current,           "$RT_TOP_DIR/riak/$(cut -d. -f1,2 <<<"$db_alt")"},
-        {previous,          "$RT_TOP_DIR/riak/$(cut -d. -f1,2 <<<"$db_prev")"},
+        {current,           "$RT_TOP_DIR/riak/$(vers_suffix "$db_alt")"},
+        {previous,          "$RT_TOP_DIR/riak/$(vers_suffix "$db_prev")"},
         {ee_root,           "$RT_TOP_DIR/riak_ee"},
-        {ee_current,        "$RT_TOP_DIR/riak_ee/$(cut -d. -f1,2 <<<"$db_alt")"},
-        {ee_previous,       "$RT_TOP_DIR/riak_ee/$(cut -d. -f1,2 <<<"$db_prev")"},
+        {ee_current,        "$RT_TOP_DIR/riak_ee/$(vers_suffix "$db_alt")"},
+        {ee_previous,       "$RT_TOP_DIR/riak_ee/$(vers_suffix "$db_prev")"},
         {cs_root,           "$RT_TOP_DIR/riak_cs_os"},
-        {cs_current,        "$RT_TOP_DIR/riak_cs_os/$(cut -d. -f1,2 <<<"$cs_vers")"},
-        {cs_previous,       "$RT_TOP_DIR/riak_cs_os/$(cut -d. -f1,2 <<<"$cs_prev")"},
+        {cs_current,        "$RT_TOP_DIR/riak_cs_os/$(vers_suffix "$cs_vers")"},
+        {cs_previous,       "$RT_TOP_DIR/riak_cs_os/$(vers_suffix "$cs_prev")"},
         {stanchion_root,    "$RT_TOP_DIR/stanchion"},
-        {stanchion_current, "$RT_TOP_DIR/stanchion/$(cut -d. -f1,2 <<<"$st_vers")"},
-        {stanchion_previous,"$RT_TOP_DIR/stanchion/$(cut -d. -f1,2 <<<"$st_prev")"}
+        {stanchion_current, "$RT_TOP_DIR/stanchion/$(vers_suffix "$st_vers")"},
+        {stanchion_previous,"$RT_TOP_DIR/stanchion/$(vers_suffix "$st_prev")"}
     ]}
 ]}.
 EOF

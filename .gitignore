@@ -1,0 +1,6 @@
+*.bak
+*.bu
+*.tmp
+*~
+/*.txt
+tmp/

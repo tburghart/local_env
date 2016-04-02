@@ -15,17 +15,19 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 # ========================================================================
 #
-# maybe set PROMPT_COMMAND to something informative
+# maybe set precmd to something informative
 #
 
-[ "${BASH-no}" != "no" ] || return
+# zsh specific file
+[ -n "$ZSH_VERSION" ] || return
 
-# make sure it's an interactive shell
-[[ -n "$PS1" ]] || return
+# make sure it's a suitable interactive shell and that non-mandatory files
+# (like this one) should be sourced
+[[ -o interactive && -o rcs ]] || return
 
 [[ -n "$HOSTNAME" ]] || export HOSTNAME="$(hostname)"
 
-__btp_func='update_terminal_info'
+__btp_func='precmd'
 __btp_prompt=''
 __btp_user="${LOGNAME:-${USER:-$(id -un)}}"
 __btp_host="${HOSTNAME%%.*}"
@@ -58,15 +60,6 @@ else
     {
         printf "\'\\e]0\;$__btp_user@$__btp_host %s\\a\'" \"\${PWD/#\${HOME}/~}\"
     }"
-fi
-
-if [[ -z "$__btp_prompt" && "$(type -t "$__btp_func")" == 'function' ]]
-then
-    __btp_prompt="$__btp_func"
-fi
-if [[ -n "$__btp_prompt" ]]
-then
-    PROMPT_COMMAND="$__btp_prompt"
 fi
 
 unset $__btp_unset __btp_unset 2>/dev/null || true

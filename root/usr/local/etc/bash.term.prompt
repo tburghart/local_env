@@ -20,7 +20,7 @@ then
     # do that
     eval "$__btp_func()
     {
-        printf "\'\\e]1337;RemoteHost=$__btp_user@$__btp_host\\a\'"
+        printf "\'\\e]1337\;RemoteHost=$__btp_user@$__btp_host\\a\'"
         printf "\'\\e]1337\;CurrentDir=%s\\a\'" \"\$PWD\"
         printf "\'\\e]0\;$__btp_user@$__btp_host %s\\a\'" \"\${PWD/#\${HOME}/~}\"
     }"

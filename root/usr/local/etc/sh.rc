@@ -1,0 +1,51 @@
+#
+# Burghart local Shell RC file
+#
+if [ -z "$PS1" ]
+then
+    return
+fi
+#
+# shell specific prompts & builtins
+#
+# if the uid could represent more than one user name, we'd prefer the
+# one provided to login
+#
+hst="$(/bin/hostname | /usr/bin/cut -d. -f1)"
+usr="${LOGNAME:-${USER:-$(/usr/bin/id -un)}}"
+if [ $(/usr/bin/id -u) -eq 0 ]
+then
+    suf='$'
+else
+    suf='#'
+fi
+if [[ -n "$BASH_VERSION" ]]
+then
+    PS1="B \\t $usr@$hst \$PWD rc:\$?\\n$suf "
+    SHELL='/bin/bash'
+    alias whence='type'
+    alias whereis='type -a'
+    alias which='type -p'
+
+elif [[ -n "$ZSH_VERSION" ]]
+then
+    PS1="Z %D{%H:%M:%S} $usr@$hst %d rc:%?
+$suf "
+    SHELL='/bin/zsh'
+    alias whereis='whence -a'
+
+elif [[ -n "$KSH_VERSION" ]]
+then
+    PS1="K \$(/bin/date '+%H:%M:%S') $usr@$hst \$PWD rc:\$?
+$suf "
+    SHELL='/bin/ksh'
+    alias whereis='whence -a'
+	alias which='whence'
+
+else    # assume some Bourne variant
+    PS1="S $usr@$hst \$PWD rc:\$?
+$suf "
+fi
+export  PS1 SHELL
+unset   hst suf usr
+

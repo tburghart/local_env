@@ -1,0 +1,66 @@
+#!/bin/bash -e
+# ========================================================================
+# Copyright (c) 2015-2016 T. R. Burghart.
+# 
+# Permission to use, copy, modify, and/or distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+# 
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+# ========================================================================
+#
+# Script to clone and set up an OTP development environment.
+#
+
+readonly  sdir="$(cd "$(dirname "$0")" && pwd)"
+readonly  sname="${0##*/}"
+readonly  spath="$sdir/$sname"
+
+usage()
+{
+    echo "Usage: ${0##*/} [-b branch-or-tag] otp-inst-label" >&2
+    exit 1
+}
+
+if [[ $# -eq 1 ]]
+then
+    otpdir="$1"
+    brargs=''
+elif [[ $# -eq 3 && "$1" == '-b' ]]
+then
+    otpdir="$3"
+    brargs="$1 $2"
+else
+    usage
+fi
+
+. "$LOCAL_ENV_DIR/otp.source.base"
+cd "$otp_source_base"
+
+$GIT clone $brargs 'git@github.com:basho/otp.git' "$otpdir"
+
+cd "$otpdir"
+readonly  otpdir="$(pwd)"
+
+envdir="../../${LOCAL_ENV_DIR#${HOME}/prj/}"
+if [[ -d "$envdir" ]]
+then
+    cd "$envdir"
+    [[ "$(pwd)" == "$LOCAL_ENV_DIR" ]] || envdir="$LOCAL_ENV_DIR"
+    cd "$otpdir"
+else
+    envdir="$LOCAL_ENV_DIR"
+fi
+readonly  envdir
+
+ln -s "$envdir/env.otp.shared" env
+
+$GIT remote add --tags erlang git@github.com:erlang/otp.git
+$GIT remote add --no-tags tedb git@github.com:tburghart/otp.git
+$GIT remote add --no-tags vinoski git@github.com:vinoski/otp.git

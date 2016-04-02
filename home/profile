@@ -30,7 +30,7 @@ unset_vars='shome stype mtype usern'
 
 BASHO_PRJ_BASE="$HOME/prj/basho"
 TRB_PRJ_BASE="$HOME/prj/tedb"
-LOCAL_ENV_DIR="$TRB_PRJ_BASE/local_env"
+LOCAL_ENV_DIR="$TRB_PRJ_BASE/local_env/env"
 for LOCAL_OTP_DIR in \
     '/opt/basho' '/opt/local' '/usr/local' \
     "$BASHO_PRJ_BASE/local" "$TRB_PRJ_BASE/local" "$HOME/local"
@@ -80,7 +80,7 @@ do
 done
 unset_vars="$unset_vars d"
 
-bpath="${bpath:+${bpath}:}${LOCAL_ENV_DIR}"
+bpath="${bpath:+${bpath}:}${LOCAL_ENV_DIR%/*}"
 
 for d in $pathbeg ${PATH//:/ } / $pathend
 do
@@ -127,46 +127,42 @@ done
 PATH="$bpath:$spath"
 export PATH
 
-case "$stype" in
-    Linux | Darwin )
-        for MAKE in $(which make) $(which gmake) make
-        do break ; done
-        ;;
-    * )
-        for MAKE in $(which gmake) $(which make) gmake
-        do break ; done
-        ;;
-esac
-export MAKE
-
-ECP='/bin/cp -p'
-ESED='/usr/bin/sed -E'
-case "$stype" in
-    Darwin )
-        ECP='/bin/cp -pX'
-        ;;
-    Linux )
-        ESED='/usr/bin/sed -r'
-        ;;
-esac
-if [[ -z "$EGREP" ]]
+[[ -n "$LANG" ]] || LANG='C'
+if [[ -z "$ECP" ]]
 then
-    unalias egrep fgrep grep 2>/dev/null
-    EGREP="$(which egrep)"
-    if [[ -z "$EGREP" ]]
+    if [[ "$stype" == 'Darwin' ]]
     then
-        for EGREP in $(which grep) grep
-        do break ; done
-        EGREP="$EGREP -E"
+        ECP='/bin/cp -pX'
+    else
+        ECP='/bin/cp -p'
     fi
 fi
-export ECP EGREP ESED
+[[ -n "$EGREP" ]] || EGREP="$(which egrep || echo egrep)"
+if [[ -z "$ESED" ]]
+then
+    if [[ "$stype" == 'Linux' ]]
+    then
+        ESED='/usr/bin/sed -r'
+    else
+        ESED='/usr/bin/sed -E'
+    fi
+fi
+[[ -n "$GIT" ]] || GIT="$(which git || echo git)"
+if [[ -z "$MAKE" ]]
+then
+    case "$stype" in
+        Darwin|Linux)
+            MAKE="$(type -p /usr/bin/make \
+                || which make || which gmake || echo make)"
+            ;;
+        *)
+            MAKE="$(which gmake || which make || echo gmake)"
+            ;;
+    esac
+fi
+export ECP EGREP ESED GIT LANG MAKE
 
-for GIT in $(which git) git
-do break ; done
-export GIT
-
-BLOCKSIZE=K
+BLOCKSIZE=1024
 for EDITOR in $(which vi) $(which nano) vi ; do break ; done
 for PAGER in $(which less) $(which more) more ; do break ; done
 export BLOCKSIZE EDITOR PAGER
@@ -183,11 +179,7 @@ then
     [[ -n "$VISUAL" ]] || VISUAL="$MATE --wait"
 else
     unset MATE
-fi
-
-if [[ -z "$VISUAL" ]]
-then
-    for VISUAL in $(which tedit) $EDITOR ; do break ; done
+    [[ -n "$VISUAL" ]] || VISUAL="$(which tedit || echo $EDITOR)"
 fi
 P4EDITOR="$VISUAL"
 WINEDITOR="$VISUAL"
@@ -201,7 +193,7 @@ fi
 
 unset $unset_vars unset_vars 2>/dev/null
 
-for ENV in "$HOME/.shrc" "$LOCAL_ENV_DIR/home/shrc" $ENV
+for ENV in "$HOME/.shrc" "${LOCAL_ENV_DIR%/*}/home/shrc" $ENV
 do
     if [[ -f "$ENV" ]]
     then

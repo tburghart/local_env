@@ -1,0 +1,64 @@
+#
+# local Common Aliases file
+#
+
+# basics
+if [ -z "$(which wget)" ]
+then
+    x="$(which curl)"
+    if [ -n "$x" ]
+    then
+        alias wget="$x --remote-name-all"
+    fi
+    unset x
+fi
+
+# default options
+alias df='/bin/df -h'
+alias scp='/usr/bin/scp -p'
+
+# common ls enhancements
+alias l.='/bin/ls -lha'
+alias la='/bin/ls -lhA'
+alias lat='/bin/ls -lhAtr'
+alias lh='/bin/ls -lhH'
+alias ll='/bin/ls -lh'
+alias lla='/bin/ls -lh'
+alias lld='/bin/ls -lhd'
+alias llf='/bin/ls -lh'
+alias lll='/bin/ls -lh'
+alias lr='/bin/ls -lhR'
+alias lt='/bin/ls -lhtr'
+
+# platform specific
+ECP='/bin/cp -p'
+EGREP='/usr/bin/egrep'
+ESED='/usr/bin/sed -E'
+case "$(/usr/bin/uname -s)" in
+    Darwin)
+        alias dscl='/usr/bin/dscl -raw .'
+        alias lchflags='/usr/bin/chflags -h'
+        alias ldd='/usr/bin/otool -L'
+        alias lla='/bin/ls -lh@'
+        alias llf='/bin/ls -lhO'
+        alias lll='/bin/ls -lhO@'
+        alias pldump='/usr/bin/plutil -convert xml1 -o -'
+        alias unhide='/usr/bin/chflags -h nohidden'
+        ECP='/bin/cp -pX'
+        ;;
+    FreeBSD)
+        ;;
+        alias lchflags='/bin/chflags -h'
+        alias llf='/bin/ls -lho'
+        alias lll='/bin/ls -lho'
+        alias unhide='/bin/chflags -h nohidden'
+    Linux)
+        ;;
+        alias llf='/bin/ls -lhZ'
+        alias lll='/bin/ls -lh --lcontext'
+        ESED='/usr/bin/sed -r'
+esac
+alias ecp="$ECP"
+alias egrep="$EGREP"
+alias esed="$ESED"
+export  ECP EGREP ESED

@@ -1,11 +1,33 @@
-#!/bin/ksh -e
+#!/bin/bash -e
+# ========================================================================
+# Copyright (c) 2015-2016 T. R. Burghart.
+# 
+# Permission to use, copy, modify, and/or distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+# 
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+# ========================================================================
+#
+# Build and install/replace an OTP instance from source.
+#
 
-typeset -ir makejobs='5'
-typeset -ir verbosity="${V:-0}"
+readonly  sdir="$(cd "$(dirname "$0")" && pwd)"
+readonly  sname="${0##*/}"
+readonly  spath="$sdir/$sname"
+
+readonly  makejobs='5'
+readonly  verbosity="${V:-0}"
 
 usage()
 {
-    echo "Usage: ${0##*/} [-h{0|1|2}] otp-name-or-path otp-inst-label" >&2
+    echo "Usage: $sname [-h{0|1|2}] otp-name-or-path otp-inst-label" >&2
     exit 1
 }
 
@@ -30,7 +52,7 @@ esac
 [[ $# -eq 2 ]] || usage
 [[ "$2" != */* ]] || usage
 
-typeset  -r otp_name="${2}"
+readonly  otp_name="${2}"
 
 case "$1" in
     */* )
@@ -53,16 +75,19 @@ case "$1" in
 esac
 readonly  otp_src
 
-[[ -z "$(whence -v kerl_deactivate 2>/dev/null)" ]] || kerl_deactivate
-[[ -z "$(whence -v reset_lenv 2>/dev/null)" ]] || reset_lenv
+kerl_deactivate 2>/dev/null || true
+reset_lenv 2>/dev/null || true
 
 cd "$otpsrc"
 
-unset   ERL_TOP ERL_LIBS MAKEFLAGS
+unset   ERL_TOP ERL_LIBS MAKEFLAGS V
+unset   EXCLUDE_OSX_RT_VERS_FLAG
 
 . "$LOCAL_ENV_DIR/os.type"
 . "$LOCAL_ENV_DIR/otp.install.base"
+. "$LOCAL_ENV_DIR/otp.source.base"
 . "$LOCAL_ENV_DIR/otp.source.version"
+. "$LOCAL_ENV_DIR/env.tool.defaults"
 
 hipe_supported()
 {
@@ -88,9 +113,6 @@ then
 else
     hipe_modes='false'
 fi
-
-unset EXCLUDE_OSX_RT_VERS_FLAG
-. "$LOCAL_ENV_DIR/env.tool.defaults"
 
 if [[ $otp_vsn_major -lt 17 ]]
 then
@@ -154,8 +176,6 @@ config_opts+=" --without-odbc"
 ERL_TOP="$(pwd)"
 PATH="$ERL_TOP/bin:$PATH"
 export  ERL_TOP PATH
-
-unset   V MAKEFLAGS
 
 for hipe in $hipe_modes
 do

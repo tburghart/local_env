@@ -21,6 +21,7 @@
 #
 # Install to $HOME/.shrc, or wherever $ENV points to
 #
+[[ -n "$PS1" ]] || return
 
 #
 # file permissions: rwxr-xr-x
@@ -29,18 +30,89 @@ umask	022
 #
 # shell specific
 #
-u="${LOGNAME:-${USER:-$(id -un)}}@$(hostname | cut -d. -f1)"
-if [ -n "$KSH_VERSION" ]
+hst="$(/bin/hostname | /usr/bin/cut -d. -f1)"
+usr="${LOGNAME:-${USER:-$(/usr/bin/id -un)}}"
+if [ $(/usr/bin/id -u) -eq 0 ]
 then
+    suf='$'
+else
+    suf='#'
+fi
+if [ -n "$BASH_VERSION" ]
+then
+    PS1="B \\t $usr@$hst \$PWD rc:\$?\\n$suf "
+    SHELL='/bin/bash'
     set -o vi
-    PS1="K \$(date '+%H:%M:%S') $u \$PWD rc:\$?
-"
-    if [[ $(id -u) -eq 0 ]]
-    then
-        PS1="${PS1}# "
-    else
-        PS1="${PS1}\$ "
-    fi
+    alias whence='type -p'
+    alias which='type -p'
+    typeof()
+    {
+        if [[ $# -ne 1 ]]
+        then
+            echo 'usage: typeof <name>' >&2
+            return 1
+        fi
+        t="$(type -t "$1")"
+        if [[ -z "$t" ]]
+        then
+            echo undefined
+        else
+            echo "$t"
+        fi
+        unset t
+    }
+
+elif [ -n "$ZSH_VERSION" ]
+then
+    PS1="Z %D{%H:%M:%S} $usr@$hst %d rc:%?
+$suf "
+    SHELL='/bin/zsh'
+    set -o append_history
+    set -o hist_ignore_all_dups
+    set -o hist_reduce_blanks
+    set -o hist_save_no_dups
+    set -o inc_append_history
+    set -o vi
+    bindkey -v
+    bindkey -M vicmd 'k' vi-up-line-or-history
+    bindkey -M vicmd 'j' vi-down-line-or-history
+    typeof()
+    {
+        if [[ $# -ne 1 ]]
+        then
+            echo 'usage: typeof <name>' >&2
+            return 1
+        fi
+        t="$(whence -v "$1")"
+        case "$t" in
+            *\ not\ found )
+                echo undefined
+                ;;
+            *\ alias\ * )
+                echo alias
+                ;;
+            *\ builtin )
+                echo builtin
+                ;;
+            *\ function )
+                echo function
+                ;;
+            *\ reserved\ word )
+                echo keyword
+                ;;
+            * )
+                echo file
+                ;;
+        esac
+        unset t
+    }
+
+elif [ -n "$KSH_VERSION" ]
+then
+    PS1="K \$(/bin/date '+%H:%M:%S') $usr@$hst \$PWD rc:\$?
+$suf "
+    SHELL='/bin/ksh'
+    set -o vi
 	alias which='whence'
     typeof()
     {
@@ -76,83 +148,10 @@ then
         unset t
     }
 
-elif [ -n "$ZSH_VERSION" ]
-then
-    set -o append_history
-    set -o hist_ignore_all_dups
-    set -o hist_reduce_blanks
-    set -o hist_save_no_dups
-    set -o inc_append_history
-    set -o vi
-    bindkey -v
-    bindkey -M vicmd 'k' vi-up-line-or-history
-    bindkey -M vicmd 'j' vi-down-line-or-history
-    PS1="Z %D{%H:%M:%S} $u %d rc:%?
-%(!.#.\$) "
-    typeof()
-    {
-        if [[ $# -ne 1 ]]
-        then
-            echo 'usage: typeof <name>' >&2
-            return 1
-        fi
-        t="$(whence -v "$1")"
-        case "$t" in
-            *\ not\ found )
-                echo undefined
-                ;;
-            *\ alias\ * )
-                echo alias
-                ;;
-            *\ builtin )
-                echo builtin
-                ;;
-            *\ function )
-                echo function
-                ;;
-            *\ reserved\ word )
-                echo keyword
-                ;;
-            * )
-                echo file
-                ;;
-        esac
-        unset t
-    }
-
-elif [ -n "$BASH_VERSION" ]
-then
-    set -o vi
-    PS1="B \\t $u \$PWD rc:\$?\\n\\$ "
-    alias whence='type -p'
-    alias which='type -p'
-    typeof()
-    {
-        if [[ $# -ne 1 ]]
-        then
-            echo 'usage: typeof <name>' >&2
-            return 1
-        fi
-        t="$(type -t "$1")"
-        if [[ -z "$t" ]]
-        then
-            echo undefined
-        else
-            echo "$t"
-        fi
-        unset t
-    }
-
 else    # assume some Bourne variant
+    PS1="S $usr@$hst \$PWD rc:\$?
+$suf "
     set -o vi
-    PS1="s $u \$PWD rc:\$?
-"
-    if [ $(id -u) -eq 0 ]
-    then
-        PS1="${PS1}# "
-    else
-        PS1="${PS1}\$ "
-    fi
     typeof()
     {
         if [ $# -ne 1 ]
@@ -184,8 +183,8 @@ else    # assume some Bourne variant
         unset t
     }
 fi
-unset   u
-export  PS1
+export  PS1 SHELL
+unset   hst suf usr
 
 if [ "$(typeof chdir)" = 'undefined' ]
 then

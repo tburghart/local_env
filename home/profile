@@ -39,7 +39,7 @@ do
 done
 export BASHO_PRJ_BASE TRB_PRJ_BASE LOCAL_ENV_DIR LOCAL_OTP_DIR
 
-pathbeg='/usr/local /opt/local /usr /opt'
+pathbeg="${LOCAL_ENV_DIR%/*} /usr/local /opt/local /usr /opt"
 pathend='/usr/local/cuda /usr/local/mysql'
 pathadd=''
 bpath=''
@@ -79,8 +79,6 @@ do
     fi
 done
 unset_vars="$unset_vars d"
-
-bpath="${bpath:+${bpath}:}${LOCAL_ENV_DIR%/*}"
 
 for d in $pathbeg ${PATH//:/ } / $pathend
 do

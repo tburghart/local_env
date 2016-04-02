@@ -47,16 +47,16 @@ case "$(/usr/bin/uname -s)" in
         ECP='/bin/cp -pX'
         ;;
     FreeBSD)
-        ;;
         alias lchflags='/bin/chflags -h'
         alias llf='/bin/ls -lho'
         alias lll='/bin/ls -lho'
         alias unhide='/bin/chflags -h nohidden'
-    Linux)
         ;;
+    Linux)
         alias llf='/bin/ls -lhZ'
         alias lll='/bin/ls -lh --lcontext'
         ESED='/usr/bin/sed -r'
+        ;;
 esac
 alias ecp="$ECP"
 alias egrep="$EGREP"

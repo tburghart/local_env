@@ -17,11 +17,22 @@
 # Install shell configuration files
 #
 
-ECP	?= /bin/cp -p
-INSTALL	:= /usr/bin/install
 PRJDIR	:= $(shell pwd)
 UID	:= $(shell /usr/bin/id -u)
 SYS	:= $(shell /usr/bin/uname -s | /usr/bin/tr '[A-Z]' '[a-z]')
+
+ifeq ($(ECP),)
+ifeq ($(SYS),darwin)
+ECP	:= /bin/cp -pX
+else
+ECP	:= /bin/cp -p
+endif
+endif
+ifeq ($(SYS),linux)
+INSTALL	:= /usr/bin/install -p
+else
+INSTALL	:= /usr/bin/install -Cp
+endif
 
 HOME_TGTS  := $(patsubst $(PRJDIR)/home/%,$(HOME)/.%,$(wildcard \
 	$(PRJDIR)/home/bashrc $(PRJDIR)/home/profile $(PRJDIR)/home/shrc))
@@ -43,11 +54,11 @@ home: $(HOME_TGTS)
 root: $(ROOT_TGTS)
 
 $(HOME)/.% : $(PRJDIR)/home/%
-	$(INSTALL) -C -p -m0644 $^ $@
+	$(INSTALL) -m0644 $^ $@
 
 /etc/% : $(PRJDIR)/root/etc/$(SYS).%
-	@echo $(INSTALL) -C -p -m0644 -o0 -g0 $^ $@
+	@echo $(INSTALL) -m0644 -o0 -g0 $^ $@
 
 /usr/local/etc/% : $(PRJDIR)/root/usr/local/etc/%
-	@echo $(INSTALL) -C -p -m0644 -o0 -g0 $^ $@
+	@echo $(INSTALL) -m0644 -o0 -g0 $^ $@
 

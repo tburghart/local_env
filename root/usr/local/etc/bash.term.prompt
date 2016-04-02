@@ -2,6 +2,8 @@
 # maybe set PROMPT_COMMAND to something informative
 #
 
+[ "${BASH-no}" != "no" ] || return
+
 [[ -n "$HOSTNAME" ]] || export HOSTNAME="$(hostname)"
 
 __btp_func='update_terminal_info'

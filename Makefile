@@ -50,8 +50,8 @@ INSTALL	:= /usr/bin/install -p
 else
 INSTALL	:= /usr/bin/install -Cp
 endif
-INSTSYS	:= $(INSTALL) -u0 -g0
-INSTUSR	:= $(INSTALL) -u$(UID) -g$(GID)
+INSTSYS	:= $(INSTALL) -o 0 -g 0
+INSTUSR	:= $(INSTALL) -o $(UID) -g $(GID)
 ifneq ($(UID),0)
 INSTSYS	:= @echo $(INSTSYS)
 endif

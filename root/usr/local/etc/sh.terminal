@@ -1,0 +1,193 @@
+#!/usr/bin/false This file is meant to be sourced
+# ========================================================================
+# Copyright (c) 2013-2016 T. R. Burghart.
+# 
+# Permission to use, copy, modify, and/or distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+# 
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+# ========================================================================
+#
+# maybe tell the terminal program where we are
+#
+
+if [ -n "$BASH_VERSION" ]
+then
+    [[ -n "$PS1" ]] || return
+    shell=bash
+    func=true
+
+elif [ -n "$KSH_VERSION" ]
+then
+    [[ -n "$PS1" ]] || return
+    shell=ksh
+    func=true
+
+elif [ -n "$ZSH_VERSION" ]
+then
+    [[ -o interactive ]] || return
+    shell=zsh
+    func=true
+
+else    # assume some Bourne variant
+    [ -n "$PS1" ] || return
+    shell=sh
+    func=''
+fi
+
+#
+# If there are multiple users with the same uid, `id` will report the first
+# one it finds, which may not be the name used to log in. With luck, `login`
+# set the actual name used in the environment.
+#
+host="$(/bin/hostname | /usr/bin/cut -d. -f1)"
+user="${LOGNAME:-${USER:-$(/usr/bin/id -un)}}"
+
+if [ $(/usr/bin/id -u) -eq 0 ]
+then
+    suff='$'
+else
+    suff='#'
+fi
+# don't assume shells handle C-style escapes in double-quoted strings!
+suff="
+$suff "
+
+if [ -n "$func" ]
+then
+    case "$TERM_PROGRAM" in
+        Apple_Terminal)
+            termp='apple'
+            ;;
+        iTerm.app)
+            termp='iterm'
+            ;;
+        xterm|rxvt|gnome-terminal)
+            termp='xterm'
+            ;;
+        *)
+            set -x
+            termp=''
+            pid=$$
+            while true
+            do
+                # let echo strip leading/trailing whitespace
+                pid="$(echo $(ps -o ppid -p $pid 2>/dev/null | tail -1))"
+                [[ "$pid" == [0-9]* && "$pid" -gt 1 ]] || break
+                # if we work it out, set TERM_PROGRAM so subshells skip this
+                str="$(echo $(ps -o comm -p $pid 2>/dev/null | tail -1))"
+                case "$str" in
+                    */Terminal.app/*/MacOS/*)
+                        TERM_PROGRAM='Apple_Terminal'
+                        export TERM_PROGRAM
+                        termp='apple'
+                        break
+                        ;;
+                    */MacOS/iTerm*)
+                        TERM_PROGRAM='iTerm.app'
+                        export TERM_PROGRAM
+                        termp='iterm'
+                        break
+                        ;;
+                    xterm|rxvt|gnome-terminal)
+                        TERM_PROGRAM="$str"
+                        export TERM_PROGRAM
+                        termp='xterm'
+                        break
+                        ;;
+                    sshd|[\(\[]*)
+                        # some system daemon, nothing to be found above here
+                        break
+                        ;;
+                esac
+            done
+            set +x
+            unset pid str
+            ;;
+    esac
+    case "$termp" in
+        apple)
+            # clear the Apple default if it's set
+            unset -f update_terminal_cwd 2>/dev/null || true
+            eval "precmd()
+            {
+                printf "\'\\e]7\;file://$HOSTNAME%s\\a\'" \"\$PWD\"
+                printf "\'\\e]0\;$user@$host %s\\a\'" \"\${PWD/#\${HOME}/~}\"
+            }"
+            # " un-choke editor syntax highlighting
+            ;;
+        iterm)
+            eval "precmd()
+            {
+                printf "\'\\e]1337\;RemoteHost=$user@$host\\a\'"
+                printf "\'\\e]1337\;CurrentDir=%s\\a\'" \"\$PWD\"
+                printf "\'\\e]0\;$user@$host %s\\a\'" \"\${PWD/#\${HOME}/~}\"
+            }"
+            # " un-choke editor syntax highlighting
+            ;;
+        xterm)
+            eval "precmd()
+            {
+                printf "\'\\e]0\;$user@$host %s\\a\'" \"\${PWD/#\${HOME}/~}\"
+            }"
+            # " un-choke editor syntax highlighting
+            ;;
+        *)
+            if [[ "$TERM" != xterm* ]]
+            then
+                # if it's not xterm-ish don't even try
+                func=''
+            else
+                # throw everything in and hope the terminal doesn't barf
+                eval "precmd()
+                {
+                    printf "\'\\e]1337\;RemoteHost=$user@$host\\a\'"
+                    printf "\'\\e]1337\;CurrentDir=%s\\a\'" \"\$PWD\"
+                    printf "\'\\e]7\;file://$HOSTNAME%s\\a\'" \"\$PWD\"
+                    printf "\'\\e]0\;$user@$host %s\\a\'" \"\${PWD/#\${HOME}/~}\"
+                }"
+                # " un-choke editor syntax highlighting
+            fi
+            ;;
+    esac
+fi
+
+case "$shell" in
+    bash)
+        if [[ -n "$func" ]]
+        then
+            PROMPT_COMMAND='precmd'
+            export PROMPT_COMMAND
+        fi
+        PS1="B \\t $user@$host \$PWD rc:\$?$suff"
+        ;;
+    ksh)
+        for date in /bin/date /usr/bin/date date
+        do
+            [[ ! -f "$date" ]] || break
+        done
+        if [[ -n "$func" ]]
+        then
+            PS1="K \$(precmd)\$($date '+%H:%M:%S') $user@$host \$PWD rc:\$?$suff"
+        else
+            PS1="K \$($date '+%H:%M:%S') $user@$host \$PWD rc:\$?$suff"
+        fi
+        unset date
+        ;;
+    zsh)
+        PS1="Z %D{%H:%M:%S} $user@$host %d rc:%?$suff"
+        ;;
+    *)
+        PS1="S $user@$host \$PWD rc:\$?$suff"
+        ;;
+esac
+export PS1
+
+unset func host shell suff termp user

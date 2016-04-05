@@ -15,24 +15,22 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 # ========================================================================
 #
-# set some common interactive shell commands that are builtins in some
+# System-wide bashrc file for interactive bash shells on Darwin.
 #
 
-if [ -n "$BASH_VERSION" ]
-then
-    [[ -n "$PS1" ]] || return
-    alias whence='type'
-    alias whereis='type -a'
-    alias which='type -p'
+#
+# System-wide .bashrc file for interactive bash(1) shells.
+#
+# VERY much bash-specific
+#
 
-elif [ -n "$KSH_VERSION" ]
-then
-    [[ -n "$PS1" ]] || return
-    alias whereis='whence -a'
-	alias which='whence'
+[[ -n "$PS1" ]] || return
 
-elif [ -n "$ZSH_VERSION" ]
-then
-    [[ -o interactive ]] || return
-    alias whereis='whence -a'
-fi
+# Make bash check its window size after a process completes
+shopt -s checkwinsize
+
+for f in sh.rc sh.paths sh.terminal sh.aliases sh.local 
+do
+    [[ ! -f "/usr/local/etc/$f" ]] || . "/usr/local/etc/$f"
+done
+unset f

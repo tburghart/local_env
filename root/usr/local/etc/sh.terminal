@@ -73,7 +73,6 @@ then
             termp='xterm'
             ;;
         *)
-            set -x
             termp=''
             pid=$$
             while true
@@ -108,7 +107,6 @@ then
                         ;;
                 esac
             done
-            set +x
             unset pid str
             ;;
     esac

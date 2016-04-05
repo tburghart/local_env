@@ -48,7 +48,7 @@
 #   /usr/local/etc/bash.term.prompt
 #   /usr/local/etc/zsh.term.prompt
 #
-home_deprecated	:=
+home_deprecated	:= $(wildcard $(HOME)/.pash_profile)
 root_deprecated	:= $(wildcard /etc/bashrc \
 	/usr/local/etc/bash.term.prompt /usr/local/etc/zsh.term.prompt)
 
@@ -156,6 +156,9 @@ root ::
 endif
 
 home :: $(HOME_TGTS)
+	@echo Home directory layout:
+	@/bin/ls -lh $(HOME)/.*rc $(HOME)/.*profile \
+		$(wildcard $(HOME)/.*login $(HOME)/.*logout)
 
 root :: $(ROOT_TGTS)
 

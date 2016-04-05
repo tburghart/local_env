@@ -26,11 +26,21 @@ shome="$HOME"
 stype="$(uname -s)"
 mtype="$(uname -m)"
 usern="${LOGNAME:-${USER:-$(id -un)}}"
-unset_vars='shome stype mtype usern'
+shell="${0#-}"
+shell="${shell##*/}"
+if [[ "$shell" != *sh && -n "$SHELL" ]]
+then
+    shell="${SHELL##*/}"
+fi
+unset_vars='shell shome stype mtype usern'
 
 BASHO_PRJ_BASE="$HOME/prj/basho"
 TRB_PRJ_BASE="$HOME/prj/tedb"
-LOCAL_ENV_DIR="$TRB_PRJ_BASE/local_env/env"
+
+ledir="$TRB_PRJ_BASE/local_env"
+LOCAL_ENV_DIR="$ledir/env"
+unset_vars="$unset_vars ledir"
+
 for LOCAL_OTP_DIR in \
     '/opt/basho' '/opt/local' '/usr/local' \
     "$BASHO_PRJ_BASE/local" "$TRB_PRJ_BASE/local" "$HOME/local"
@@ -39,7 +49,12 @@ do
 done
 export BASHO_PRJ_BASE TRB_PRJ_BASE LOCAL_ENV_DIR LOCAL_OTP_DIR
 
-pathbeg="${LOCAL_ENV_DIR%/*} /usr/local /opt/local /usr /opt"
+pathbeg="$ledir /usr/local /opt/local"
+if [[ "$stype" == 'SunOS' ]]
+then
+    pathbeg="$pathbeg /usr/xpg6 /usr/xpg4"
+fi
+pathbeg="$pathbeg /usr /opt"
 pathend='/usr/local/cuda /usr/local/mysql'
 pathadd=''
 bpath=''
@@ -58,10 +73,6 @@ then
         spath="${spath:+${spath}:}$HOME/sbin/OsX"
     fi
 else
-    if [[ "$stype" == 'SunOS' ]]
-    then
-        pathbeg='/usr/local /opt/local /usr/xpg6 /usr/xpg4 /usr /opt'
-    fi
     pathend="/usr/X11R7 /usr/X11R6 $pathend"
     pathadd="$pathadd /usr/bin/X11R7 /usr/bin/X11R6 /usr/bin/X11"
 fi
@@ -183,22 +194,67 @@ P4EDITOR="$VISUAL"
 WINEDITOR="$VISUAL"
 export VISUAL P4EDITOR WINEDITOR
 
-# in case $HOME is changed along the way ...
-if [[ "$HOME" != "$shome" ]]
-then
-    cd "$HOME"
-fi
+case "$shell" in
+    bash)
+    # bash stupidly doesn't source its rc files from an interactive login shell
+        if [[ -n "$PS1" ]]
+        then
+            for f in "$HOME/.bashrc" "$HOME/.shrc"
+            do
+                if [[ -f "$f" ]]
+                then
+                    if [[ "$f" != "$HOME/.bashrc" ]]
+                    then
+                        echo Warning: '***' non-standard environment file $f \
+                            will not be sourced by interactive bash \
+                            subshells, consider installing as $HOME/.bashrc
+                    fi
+                    . "$f"
+                    break
+                fi
+            done
+            unset_vars="$unset_vars f ENV"
+        else
+            unset_vars="$unset_vars ENV"
+        fi
+        ;;
+    ksh)
+        if [[ -z "$ENV" || "$ENV" = "$HOME/.kshrc" || ! -f "$ENV" ]]
+        then
+            if [[ ! -f "$HOME/.kshrc" && -f "$HOME/.shrc" ]]
+            then
+                ENV="$HOME/.shrc"
+                export ENV
+            else
+                unset_vars="$unset_vars ENV"
+            fi
+        fi
+        ;;
+    sh)
+        if [[ -z "$ENV" || ! -f "$ENV" ]]
+        then
+            if [[ -f "$HOME/.shrc" ]]
+            then
+                ENV="$HOME/.shrc"
+                export ENV
+            else
+                unset_vars="$unset_vars ENV"
+            fi
+        fi
+        ;;
+    zsh)
+        if [[ ! -f "$HOME/.zshrc" && -o interactive && -f "$HOME/.shrc" ]]
+        then
+            echo Warning: '***' non-standard environment file $HOME/.shrc \
+                will not be sourced by interactive zsh subshells, consider \
+                installing as $HOME/.zshrc
+            . "$HOME/.shrc"
+        fi
+        unset_vars="$unset_vars ENV"
+        ;;
+    *)
+        unset_vars="$unset_vars ENV"
+        ;;
+esac
 
 unset $unset_vars unset_vars 2>/dev/null
-
-for ENV in "$HOME/.shrc" "${LOCAL_ENV_DIR%/*}/home/shrc" $ENV
-do
-    if [[ -f "$ENV" ]]
-    then
-        export ENV
-        . "$ENV"
-        # done, get out now to avoid 'unset' below
-        return
-    fi
-done
-unset ENV

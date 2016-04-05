@@ -18,6 +18,39 @@
 #
 # Requires GNU Make functionality and a Unix-y environment.
 #
+# Builds a proper profile/rc structure and removes leftover gunk.
+#
+# The result looks like:
+#   /etc/profile
+#   /etc/zshenv
+#   /etc/zshrc
+#   /usr/local/etc/sh.aliases
+#   /usr/local/etc/sh.rc
+#   /usr/local/etc/sh.terminal
+#   ~/.bash_profile
+#   ~/.bashrc
+#   ~/.kshrc
+#   ~/.profile
+#   ~/.shrc
+#   ~/.zprofile
+#   ~/.zshrc
+#
+# Where applicable:
+#   /etc/profile.d/zzz_local.sh
+#
+# Used if present:
+#   /usr/local/etc/sh.paths
+#   /usr/local/etc/sh.local
+#
+# !!! Removed if present:
+#
+#   /etc/bashrc
+#   /usr/local/etc/bash.term.prompt
+#   /usr/local/etc/zsh.term.prompt
+#
+home_deprecated	:=
+root_deprecated	:= $(wildcard /etc/bashrc \
+	/usr/local/etc/bash.term.prompt /usr/local/etc/zsh.term.prompt)
 
 PRJDIR	:= $(CURDIR)
 STYPE	:= $(or $(shell /usr/bin/uname -s 2>/dev/null \
@@ -45,15 +78,17 @@ else
 PROF_D	:= false
 endif
 
-ifeq ($(STYPE),linux)
-INSTALL	:= /usr/bin/install -p
-else
-INSTALL	:= /usr/bin/install -Cp
-endif
+# counting on this unlinking the destination file before copying
+INSTALL	:= /usr/bin/install -cp
+
 INSTSYS	:= $(INSTALL) -o 0 -g 0
 INSTUSR	:= $(INSTALL) -o $(UID) -g $(GID)
+LNSYS	:= /bin/ln -fs
+LNUSR	:= $(LNSYS)
+
 ifneq ($(UID),0)
 INSTSYS	:= @echo $(INSTSYS)
+LNSYS	:= @echo $(LNSYS)
 endif
 
 INSTUF	:= $(INSTUSR) -m 0644
@@ -83,11 +118,18 @@ ROOT_TGTS  += $(patsubst $(PRJDIR)/root/usr/local/etc/%, /usr/local/etc/%, \
 	$(wildcard $(foreach pat,$(SH_LOC),$(PRJDIR)/root/usr/local/etc/$(pat))))
 
 ifeq ($(PROF_D),true)
+ifneq ($(shell egrep -qw pathmunge /etc/profile.d/* 2>/dev/null || echo no),no)
+$(warning Files in /etc/profile.d use pathmunge)
+endif
 ROOT_TGTS  += $(patsubst $(PRJDIR)/root/$(STYPE)/etc/profile.d/%, /etc/profile.d/%, \
 	$(wildcard $(PRJDIR)/root/$(STYPE)/etc/profile.d/*))
 ROOT_TGTS  += $(patsubst $(PRJDIR)/root/etc/profile.d/%, /etc/profile.d/%, \
 	$(wildcard $(PRJDIR)/root/etc/profile.d/*))
 endif
+
+# these will get symlinked if source files don't exist
+HOME_TGTS  += $(foreach fn, zprofile bashrc kshrc zshrc, $(HOME)/.$(fn))
+ROOT_TGTS  += $(foreach fn, , /etc/$(fn))
 
 # sort to remove duplicates
 HOME_TGTS  := $(sort $(HOME_TGTS))
@@ -101,28 +143,57 @@ else
 default: root
 endif
 
-home: $(HOME_TGTS)
+ifneq ($(home_deprecated),)
+home ::
+	@echo Clean up manually with command:
+	@echo /bin/rm $(home_deprecated)
+endif
 
-root: $(ROOT_TGTS)
+ifneq ($(root_deprecated),)
+root ::
+	@echo Clean up manually with command:
+	@echo /bin/rm $(root_deprecated)
+endif
 
-$(HOME)/.% : $(PRJDIR)/home/%
-	$(INSTALL) -m0644 $^ $@
+home :: $(HOME_TGTS)
+
+root :: $(ROOT_TGTS)
 
 /etc/% : $(PRJDIR)/root/$(STYPE)/etc/%
-	$(INSTSF) $^ $@
+	$(INSTSF) $< $@
 
 /etc/% : $(PRJDIR)/root/etc/%
-	$(INSTSF) $^ $@
+	$(INSTSF) $< $@
 
 /usr/local/etc/% : $(PRJDIR)/root/$(STYPE)/usr/local/etc/%
-	$(INSTSF) $^ $@
+	$(INSTSF) $< $@
 
 /usr/local/etc/% : $(PRJDIR)/root/usr/local/etc/%
-	$(INSTSF) $^ $@
+	$(INSTSF) $< $@
 
 $(HOME)/.% : $(PRJDIR)/home/$(STYPE)/%
-	$(INSTUF) $^ $@
+	$(INSTUF) $< $@
 
 $(HOME)/.% : $(PRJDIR)/home/%
-	$(INSTUF) $^ $@
+	$(INSTUF) $< $@
+
+# create symlinks for files that don't have sources
+
+/etc/zprofile : /etc/profile
+	$(LNSYS) $(<F) $@
+
+$(HOME)/.bash_profile : $(HOME)/.profile
+	$(LNUSR) $(<F) $@
+
+$(HOME)/.zprofile : $(HOME)/.profile
+	$(LNUSR) $(<F) $@
+
+$(HOME)/.bashrc : $(HOME)/.shrc
+	$(LNUSR) $(<F) $@
+
+$(HOME)/.kshrc : $(HOME)/.shrc
+	$(LNUSR) $(<F) $@
+
+$(HOME)/.zshrc : $(HOME)/.shrc
+	$(LNUSR) $(<F) $@
 

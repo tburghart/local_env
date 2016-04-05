@@ -15,22 +15,14 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 # ========================================================================
 #
-# System-wide bashrc file for interactive bash shells on Darwin.
+# System-wide rc file for interactive zsh shells on Darwin.
 #
 
-#
-# System-wide .bashrc file for interactive bash(1) shells.
-#
-# VERY much bash-specific
-#
-
-[[ -n "$PS1" ]] || return
-
-# Make bash check its window size after a process completes
-shopt -s checkwinsize
-
-for f in sh.rc sh.paths sh.terminal sh.aliases sh.local 
+for __prf in sh.rc sh.paths sh.terminal sh.aliases sh.local 
 do
-    [[ ! -f "/usr/local/etc/$f" ]] || . "/usr/local/etc/$f"
+    if [ -f /usr/local/etc/$__prf ]
+    then
+        . /usr/local/etc/$__prf
+    fi
 done
-unset f
+unset __prf

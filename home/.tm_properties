@@ -1,0 +1,7 @@
+# project
+projectDirectory    = "$CWD"
+windowTitle         = "[local_env/home]  $TM_FILENAME $windowTitleSCM"
+
+# default file type
+[ attr.untitled ]
+fileType            = 'source.shell'

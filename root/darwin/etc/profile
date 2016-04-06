@@ -45,7 +45,6 @@ then
 else
     __prf_sh=sh
 fi
-set -x
 if [ -z "$SHELL" -o ! -f "$SHELL" ]
 then
     __prf_fn=`basename "$SHELL"`
@@ -63,7 +62,6 @@ then
     fi
     unset __prf_fn
 fi
-set +x
 
 if [ -n "$PS1" ]
 then

@@ -96,7 +96,6 @@ then
 else
     __prf_sh=sh
 fi
-set -x
 if [ -z "$SHELL" -o ! -f "$SHELL" ]
 then
     __prf_fn=`basename "$SHELL"`
@@ -114,7 +113,6 @@ then
     fi
     unset __prf_fn
 fi
-set +x
 
 # default Linux profiles source the shell rc file even in non-interactive
 # mode, but that's stupid and Homey don't play that game

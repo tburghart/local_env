@@ -60,7 +60,7 @@ then
                 break
             fi
         done
-    done
+    fi
     unset __prf_fn
 fi
 set +x

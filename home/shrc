@@ -21,170 +21,219 @@
 #
 # Install to $HOME/.shrc, or wherever $ENV points to
 #
+# Assume that I've chosen to use a relatively modern shell, so I don't
+# have to protect against dinosaurs like the system-level files do
+#
 [[ -n "$PS1" ]] || return
 
 #
 # file permissions: rwxr-xr-x
 #
 umask	022
-#
-# shell specific
-#
-hst="$(/bin/hostname | /usr/bin/cut -d. -f1)"
-usr="${LOGNAME:-${USER:-$(/usr/bin/id -un)}}"
-if [ $(/usr/bin/id -u) -eq 0 ]
+
+# what shell are we using?
+if [[ -n "$BASH_VERSION" ]]
 then
-    suf='$'
+    __shrc_sh=bash
+elif [[ -n "$KSH_VERSION" ]]
+then
+    __shrc_sh=ksh
+elif [[ -n "$ZSH_VERSION" ]]
+then
+    __shrc_sh=zsh
 else
-    suf='#'
+    __shrc_sh=sh
 fi
-if [ -n "$BASH_VERSION" ]
-then
-    PS1="B \\t $usr@$hst \$PWD rc:\$?\\n$suf "
-    SHELL='/bin/bash'
-    set -o vi
-    alias whence='type -p'
-    alias which='type -p'
-    typeof()
-    {
-        if [[ $# -ne 1 ]]
-        then
-            echo 'usage: typeof <name>' >&2
-            return 1
-        fi
-        t="$(type -t "$1")"
-        if [[ -z "$t" ]]
-        then
-            echo undefined
-        else
-            echo "$t"
-        fi
-        unset t
-    }
 
-elif [ -n "$ZSH_VERSION" ]
+if [[ $__shrc_sh = zsh && -r /etc/zshrc ]]
 then
-    PS1="Z %D{%H:%M:%S} $usr@$hst %d rc:%?
-$suf "
-    SHELL='/bin/zsh'
-    set -o append_history
-    set -o hist_ignore_all_dups
-    set -o hist_reduce_blanks
-    set -o hist_save_no_dups
-    set -o inc_append_history
-    set -o vi
-    bindkey -v
-    bindkey -M vicmd 'k' vi-up-line-or-history
-    bindkey -M vicmd 'j' vi-down-line-or-history
-    typeof()
-    {
-        if [[ $# -ne 1 ]]
-        then
-            echo 'usage: typeof <name>' >&2
-            return 1
-        fi
-        t="$(whence -v "$1")"
-        case "$t" in
-            *\ not\ found )
-                echo undefined
-                ;;
-            *\ alias\ * )
-                echo alias
-                ;;
-            *\ builtin )
-                echo builtin
-                ;;
-            *\ function )
-                echo function
-                ;;
-            *\ reserved\ word )
-                echo keyword
-                ;;
-            * )
-                echo file
-                ;;
-        esac
-        unset t
-    }
-
-elif [ -n "$KSH_VERSION" ]
+    true
+elif [[ -r /etc/${__shrc_sh}rc ]]
 then
-    PS1="K \$(/bin/date '+%H:%M:%S') $usr@$hst \$PWD rc:\$?
-$suf "
-    SHELL='/bin/ksh'
-    set -o vi
-	alias which='whence'
-    typeof()
-    {
-        if [[ $# -ne 1 ]]
-        then
-            echo 'usage: typeof <name>' >&2
-            return 1
-        fi
-        t="$(whence -v "$1" 2>/dev/null)"
-        case "$t" in
-            *\ tracked\ alias\ * )
-                echo file
-                ;;
-            *\ alias\ * )
-                echo alias
-                ;;
-            *\ builtin )
-                echo builtin
-                ;;
-            *\ function )
-                echo function
-                ;;
-            *\ keyword )
-                echo keyword
-                ;;
-            '' )
-                echo undefined
-                ;;
-            * )
-                echo file
-                ;;
-        esac
-        unset t
-    }
-
-else    # assume some Bourne variant
-    PS1="S $usr@$hst \$PWD rc:\$?
-$suf "
-    set -o vi
-    typeof()
-    {
-        if [ $# -ne 1 ]
-        then
-            echo 'usage: typeof <name>' >&2
-            return 1
-        fi
-        t="$(type "$1" 2>/dev/null 1| head -1)"
-        case "$t" in
-            '' )
-                echo undefined
-                ;;
-            *\ aliased\ * )
-                echo alias
-                ;;
-            *\ builtin )
-                echo builtin
-                ;;
-            *\ function )
-                echo function
-                ;;
-            *\ reserved\ word )
-                echo keyword
-                ;;
-            * )
-                echo file
-                ;;
-        esac
-        unset t
-    }
+    . /etc/${__shrc_sh}rc
+elif [[ -r /etc/shrc ]]
+then
+    . /etc/shrc
 fi
-export  PS1 SHELL
-unset   hst suf usr
+
+# if it's there, assume it's already been sourced
+if [[ ! -r /usr/local/etc/sh.terminal ]]
+then
+    host="$(/bin/hostname | /usr/bin/cut -d. -f1)"
+    user="${LOGNAME:-${USER:-$(/usr/bin/id -un)}}"
+    if [[ $(/usr/bin/id -u) -eq 0 ]]
+    then
+        suff='$'
+    else
+        suff='#'
+    fi
+    # don't assume shells handle C-style escapes in double-quoted strings!
+    suff="
+$suff "
+    case "$__shrc_sh" in
+        bash)
+            # bash format
+            PS1="B \\t $user@$host \$PWD rc:\$?$suff"
+            ;;
+        ksh)
+            # ksh don't know nuthin 'bout dates
+            for __shrc_date in /bin/date /usr/bin/date date
+            do
+                [[ ! -f "$__shrc_date" ]] || break
+            done
+            PS1="K \$($__shrc_date '+%H:%M:%S') $user@$host \$PWD rc:\$?$suff"
+            unset __shrc_date
+            ;;
+        zsh)
+            # zsh format
+            PS1="Z %D{%H:%M:%S} $user@$host %d rc:%?$suff"
+            ;;
+        *)
+            # even this may be too much, but try it
+            PS1="S $user@$host \$PWD rc:\$?$suff"
+            ;;
+    esac
+    export PS1
+fi
+
+# shell-specific options and functions
+case "$__shrc_sh" in
+    bash)
+        # bash specific
+        set -o vi
+        alias whence='type -p'
+        alias which='type -p'
+        typeof()
+        {
+            if [[ $# -ne 1 ]]
+            then
+                echo 'usage: typeof <name>' >&2
+                return 1
+            fi
+            local t="$(type -t "$1")"
+            if [[ -z "$t" ]]
+            then
+                echo undefined
+            else
+                echo "$t"
+            fi
+        }
+        ;;
+    ksh)
+        # ksh specific
+        set -o vi
+    	alias which='whence'
+        typeof()
+        {
+            if [[ $# -ne 1 ]]
+            then
+                echo 'usage: typeof <name>' >&2
+                return 1
+            fi
+            t="$(whence -v "$1" 2>/dev/null)"
+            case "$t" in
+                *\ tracked\ alias\ *)
+                    echo file
+                    ;;
+                *\ alias\ *)
+                    echo alias
+                    ;;
+                *\ builtin)
+                    echo builtin
+                    ;;
+                *\ function)
+                    echo function
+                    ;;
+                *\ keyword)
+                    echo keyword
+                    ;;
+                '')
+                    echo undefined
+                    ;;
+                *)
+                    echo file
+                    ;;
+            esac
+            unset t
+        }
+        ;;
+    zsh)
+        # zsh specific
+        set -o append_history
+        set -o hist_ignore_all_dups
+        set -o hist_reduce_blanks
+        set -o hist_save_no_dups
+        set -o inc_append_history
+        set -o vi
+        bindkey -v
+        bindkey -M vicmd 'k' vi-up-line-or-history
+        bindkey -M vicmd 'j' vi-down-line-or-history
+        typeof()
+        {
+            if [[ $# -ne 1 ]]
+            then
+                echo 'usage: typeof <name>' >&2
+                return 1
+            fi
+            t="$(whence -v "$1")"
+            case "$t" in
+                *\ not\ found)
+                    echo undefined
+                    ;;
+                *\ alias\ *)
+                    echo alias
+                    ;;
+                *\ builtin)
+                    echo builtin
+                    ;;
+                *\ function)
+                    echo function
+                    ;;
+                *\ reserved\ word)
+                    echo keyword
+                    ;;
+                *)
+                    echo file
+                    ;;
+            esac
+            unset t
+        }
+        ;;
+    *)
+        # assume something vaguely Bourne-ish
+        set -o vi
+        typeof()
+        {
+            if [ $# -ne 1 ]
+            then
+                echo 'usage: typeof <name>' >&2
+                return 1
+            fi
+            t="$(type "$1" 2>/dev/null 1| head -1)"
+            case "$t" in
+                '')
+                    echo undefined
+                    ;;
+                *\ aliased\ *)
+                    echo alias
+                    ;;
+                *\ builtin)
+                    echo builtin
+                    ;;
+                *\ function)
+                    echo function
+                    ;;
+                *\ reserved\ word)
+                    echo keyword
+                    ;;
+                *)
+                    echo file
+                    ;;
+            esac
+            unset t
+        }
+        ;;
+esac
 
 if [ "$(typeof chdir)" = 'undefined' ]
 then

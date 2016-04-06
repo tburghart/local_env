@@ -17,7 +17,8 @@
 #
 # System-wide profile for Bourne-ish shells on Darwin.
 #
-# This needs to work for sh, bash, and ksh; zsh uses separate files.
+# This needs to work for sh, bash, ksh, and zsh, though zsh handles sourcing
+# the shrc file on its own.
 #
 
 if [ -x /usr/libexec/path_helper ]
@@ -25,16 +26,50 @@ then
 	eval `/usr/libexec/path_helper -s`
 fi
 
-if [ -z "$PS1" ]
+# strictly for per-system global environment overrides
+if [ -r /usr/local/etc/env.local ]
 then
-    return
+    . /usr/local/etc/env.local
 fi
 
-for __prf in sh.rc sh.paths sh.terminal sh.aliases sh.local 
-do
-    if [ -f /usr/local/etc/$__prf ]
+# see if we can assure that $SHELL is set to something sane
+if [ -n "$BASH_VERSION" ]
+then
+    __prf_sh=bash
+elif [ -n "$KSH_VERSION" ]
+then
+    __prf_sh=ksh
+elif [ -n "$ZSH_VERSION" ]
+then
+    __prf_sh=zsh
+else
+    __prf_sh=sh
+fi
+if [ -z "$SHELL" -o ! -f "$SHELL" ] \
+|| [ "$SHELL" != */$__prf_sh -a "$SHELL" != */r$__prf_sh ]
+then
+    for __prf in /bin/$__prf_sh /usr/bin/$__prf_sh `which $__prf_sh`
+    do
+        if [ -f "$__prf" -a -x "$__prf" ]
+        then
+            SHELL="$__prf"
+            export SHELL
+        fi
+    done
+fi
+
+if [ -n "$PS1" ]
+then
+    if [ $__prf_sh = zsh -a -r /etc/zshrc ]
     then
-        . /usr/local/etc/$__prf
+        true
+    elif [ -r /etc/${__prf_sh}rc ]
+    then
+        . /etc/${__prf_sh}rc
+    elif [ -r /etc/shrc ]
+    then
+        . /etc/shrc
     fi
-done
-unset __prf
+fi
+
+unset __prf __prf_sh

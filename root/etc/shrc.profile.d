@@ -1,6 +1,6 @@
 #!/usr/bin/false This file is meant to be sourced
 # ========================================================================
-# Copyright (c) 2013-2016 T. R. Burghart.
+# Copyright (c) 2010-2016 T. R. Burghart.
 # 
 # Permission to use, copy, modify, and/or distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -15,13 +15,14 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 # ========================================================================
 #
-# System-wide environment for all zsh shells on Darwin.
-#
-# This sets up the PATH only; if interactive the /etc/zshrc file is sourced
-# if not disabled.
+# System-wide rc file for interactive shells.
 #
 
-if [ -x /usr/libexec/path_helper ]
-then
-	eval `/usr/libexec/path_helper -s`
-fi
+for __shrc_f in /etc/profile.d/*.sh /usr/local/etc/sh.* 
+do
+    if [ -r "$__shrc_f" ]
+    then
+        . "$__shrc_f"
+    fi
+done
+unset __shrc_f

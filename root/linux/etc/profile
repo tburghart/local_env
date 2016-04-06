@@ -1,70 +1,130 @@
-# /etc/profile
+#!/usr/bin/false This file is meant to be sourced
+# ========================================================================
+# Copyright (c) 1994-2016 T. R. Burghart.
+# 
+# Permission to use, copy, modify, and/or distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+# 
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+# ========================================================================
+#
+# System-wide profile for Bourne-ish shells on Linux.
+#
+# This needs to work for sh, bash, ksh, and zsh, though zsh handles sourcing
+# the shrc file on its own.
+#
 
-# System wide environment and startup programs, for login setup
-# Functions and aliases go in /etc/bashrc
+if [ -z "$EUID" ]
+then
+    EUID="$(/usr/bin/id -u)"
+fi
+if [ -z "$UID" ]
+then
+    UID="$(/usr/bin/id -ru)"
+fi
+if [ -z "$LOGNAME" ]
+then
+    if [ -n "$USER" ]
+    then
+        LOGNAME="$USER"
+    else
+        LOGNAME="$(/usr/bin/id -un)"
+    fi
+fi
+if [ -z "$USER" ]
+then
+    USER="$LOGNAME"
+fi
+MAIL="/var/spool/mail/$(/usr/bin/id -un)"
 
-# It's NOT a good idea to change this file unless you know what you
-# are doing. It's much better to create a custom.sh shell script in
-# /etc/profile.d/ to make custom changes to your environment, as this
-# will prevent the need for merging in future updates.
+HOSTNAME="$(/usr/bin/hostname 2>/dev/null)"
+HISTSIZE=1000
+if [ "$HISTCONTROL" = 'ignorespace' ]
+then
+    HISTCONTROL=ignoreboth
+else
+    HISTCONTROL=ignoredups
+fi
 
-pathmunge () {
-    case ":${PATH}:" in
-        *:"$1":*)
+# the standard Linux profile is lenient with non-system umasks, but I'm not
+umask 022
+
+# pathmunge is an abomination, just be smart
+# system /sbin should ALWAYS come before local variants for the superuser, but
+# normal users may want local overrides first, which makes it easier anyway
+for __prf in /usr/local/sbin /sbin
+do
+    case "$PATH" in
+        *:$__prf:*|$__prf:*|*:$__prf)
             ;;
         *)
-            if [ "$2" = "after" ] ; then
-                PATH=$PATH:$1
+            if [ "$EUID" = "0" ]
+            then
+                PATH="$__prf:$PATH"
             else
-                PATH=$1:$PATH
+                PATH="$PATH:$__prf"
             fi
+            ;;
     esac
-}
-
-if [ -z "$EUID" ]; then EUID=`/usr/bin/id -u`; fi
-if [ -z "$UID" ]; then UID=`/usr/bin/id -ru`; fi
-if [ -z "$LOGNAME" ]; then LOGNAME="`/usr/bin/id -un`"; fi
-if [ -z "$USER" ]; then USER="$LOGNAME"; fi
-MAIL="/var/spool/mail/`/usr/bin/id -un`"
-
-# Path manipulation
-if [ "$EUID" = "0" ]; then
-    pathmunge /usr/sbin
-    pathmunge /usr/local/sbin
-else
-    pathmunge /usr/local/sbin after
-    pathmunge /usr/sbin after
-fi
-
-HOSTNAME=`/usr/bin/hostname 2>/dev/null`
-HISTSIZE=1000
-if [ "$HISTCONTROL" = "ignorespace" ] ; then
-    export HISTCONTROL=ignoreboth
-else
-    export HISTCONTROL=ignoredups
-fi
-
-export PATH USER LOGNAME MAIL HOSTNAME HISTSIZE HISTCONTROL
-
-# By default, we want umask to get set. This sets it for login shell
-# Current threshold for system reserved uid/gids is 200
-# You could check uidgid reservation validity in
-# /usr/share/doc/setup-*/uidgid file
-if [ $UID -gt 199 ] && [ "`id -gn`" = "`id -un`" ]; then
-    umask 002
-else
-    umask 022
-fi
-
-for i in /etc/profile.d/*.sh ; do
-    if [ -r "$i" ]; then
-        if [ "${-#*i}" != "$-" ]; then 
-            . "$i"
-        else
-            . "$i" >/dev/null
-        fi
-    fi
 done
 
-unset i
-unset -f pathmunge
+export HISTCONTROL HISTSIZE HOSTNAME LOGNAME MAIL PATH USER
+
+# strictly for per-system global environment overrides
+if [ -r /usr/local/etc/env.local ]
+then
+    . /usr/local/etc/env.local
+fi
+
+# see if we can assure that $SHELL is set to something sane
+if [ -n "$BASH_VERSION" ]
+then
+    __prf_sh=bash
+elif [ -n "$KSH_VERSION" ]
+then
+    __prf_sh=ksh
+elif [ -n "$ZSH_VERSION" ]
+then
+    __prf_sh=zsh
+else
+    __prf_sh=sh
+fi
+if [ -z "$SHELL" -o ! -f "$SHELL" ] \
+|| [ "$SHELL" != */$__prf_sh -a "$SHELL" != */r$__prf_sh ]
+then
+    for __prf in /bin/$__prf_sh /usr/bin/$__prf_sh `which $__prf_sh`
+    do
+        if [ -f "$__prf" -a -x "$__prf" ]
+        then
+            SHELL="$__prf"
+            export SHELL
+        fi
+    done
+fi
+
+# default Linux profiles source the shell rc file even in non-interactive
+# mode, but that's stupid and Homey don't play that game
+# if you're relying on paths being augmented in /etc/profile.d scripts for
+# non-interactive scripts, you're doing it wrong
+if [ -n "$PS1" ]
+then
+    if [ $__prf_sh = zsh -a -r /etc/zshrc ]
+    then
+        true
+    elif [ -r /etc/${__prf_sh}rc ]
+    then
+        . /etc/${__prf_sh}rc
+    elif [ -r /etc/shrc ]
+    then
+        . /etc/shrc
+    fi
+fi
+
+unset __prf __prf_sh

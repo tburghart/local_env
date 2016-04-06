@@ -22,181 +22,241 @@
 #
 # The result looks like:
 #   /etc/profile
-#   /etc/zshenv
-#   /etc/zshrc
+#   /etc/shrc
+#   /etc/zprofile       -> /etc/profile
+#   /etc/zshrc          -> /etc/shrc
 #   /usr/local/etc/sh.aliases
 #   /usr/local/etc/sh.rc
 #   /usr/local/etc/sh.terminal
-#   ~/.bash_profile
-#   ~/.bashrc
-#   ~/.kshrc
 #   ~/.profile
 #   ~/.shrc
-#   ~/.zprofile
-#   ~/.zshrc
-#
-# Where applicable:
-#   /etc/profile.d/zzz_local.sh
+#   ~/.bash_profile     -> ~/.profile
+#   ~/.bashrc           -> ~/.shrc
+#   ~/.kshrc            -> ~/.shrc
+#   ~/.zprofile         -> ~/.profile
+#   ~/.zshrc            -> ~/.shrc
 #
 # Used if present:
-#   /usr/local/etc/sh.paths
-#   /usr/local/etc/sh.local
+#   /etc/profile.d/*.sh
+#   /usr/local/etc/sh.*
 #
 # !!! Removed if present:
 #
 #   /etc/bashrc
+#   /etc/kshrc
+#   /etc/zshenv
+#   /etc/profile.d/zzz_local.sh
+#   /usr/local/etc/sh.local
 #   /usr/local/etc/bash.term.prompt
 #   /usr/local/etc/zsh.term.prompt
+#   ~/.zshenv
 #
-home_deprecated	:= $(wildcard $(HOME)/.pash_profile)
-root_deprecated	:= $(wildcard /etc/bashrc \
-	/usr/local/etc/bash.term.prompt /usr/local/etc/zsh.term.prompt)
+home_deprecated	:= $(wildcard $(HOME)/.zshenv)
+root_deprecated	:= $(wildcard \
+	/etc/bashrc \
+	/etc/kshrc \
+	/etc/zshenv \
+	/etc/profile.d/zzz_local.sh \
+	/usr/local/etc/sh.local \
+	/usr/local/etc/bash.term.prompt \
+	/usr/local/etc/zsh.term.prompt)
 
-PRJDIR	:= $(CURDIR)
-STYPE	:= $(or $(shell /usr/bin/uname -s 2>/dev/null \
+prjdir	:= $(CURDIR)
+stype	:= $(or $(shell /usr/bin/uname -s 2>/dev/null \
 		| /usr/bin/tr '[A-Z]' '[a-z]' 2>/dev/null), \
 		$(error Can't determine system type))
 
-UID	:= $(or $(shell /usr/bin/id -u 2>/dev/null), \
+uid	:= $(or $(shell /usr/bin/id -u 2>/dev/null), \
 		$(error Can't figure out your UID))
-GID	:= $(or $(shell /usr/bin/id -g 2>/dev/null), \
+gid	:= $(or $(shell /usr/bin/id -g 2>/dev/null), \
 		$(error Can't figure out your GID))
 
 # try to get the actual login name, for the test below
-UNM	:= $(or $(LOGNAME),$(USER),$(shell /usr/bin/id -un 2>/dev/null), \
+usrname	:= $(or $(LOGNAME),$(USER),$(shell /usr/bin/id -un 2>/dev/null), \
 		$(error Can't figure out your login name))
 
 # only install to root's home directory if there's no alternate superuser
 # on my systems, by convention that's 'toor'
-ifeq ($(UID)/$(UNM),0/root)
-NO_HOME	:= $(shell /usr/bin/id -u toor 2>/dev/null)
+ifeq	($(uid)/$(usrname),0/root)
+no_home	:= $(shell /usr/bin/id -u toor 2>/dev/null)
 endif
 
-ifeq ($(shell test -d /etc/profile.d || echo no),)
-PROF_D	:= true
+ifeq	($(shell test -d /etc/profile.d || echo no),)
+ifneq	($(shell egrep -qw pathmunge /etc/profile.d/* 2>/dev/null || echo no),no)
+$(warning Files in /etc/profile.d use pathmunge)
+endif
+prof_d	:= true
 else
-PROF_D	:= false
+prof_d	:= false
 endif
 
 # counting on this unlinking the destination file before copying
 INSTALL	:= /usr/bin/install -cp
 
 INSTSYS	:= $(INSTALL) -o 0 -g 0
-INSTUSR	:= $(INSTALL) -o $(UID) -g $(GID)
+INSTUSR	:= $(INSTALL) -o $(uid) -g $(gid)
 LNSYS	:= /bin/ln -fs
-LNUSR	:= $(LNSYS)
+LNUSR	:= /bin/ln -fs
 
-ifneq ($(UID),0)
+ifneq	($(uid),0)
 INSTSYS	:= @echo $(INSTSYS)
 LNSYS	:= @echo $(LNSYS)
 endif
 
-INSTUF	:= $(INSTUSR) -m 0644
 INSTSF	:= $(INSTSYS) -m 0644
-
-INSTUX	:= $(INSTUSR) -m 0755
+INSTSL	:= $(LNSYS)
 INSTSX	:= $(INSTSYS) -m 0755
 
+INSTUF	:= $(INSTUSR) -m 0644
+INSTUL	:= $(LNUSR)
+INSTUX	:= $(INSTUSR) -m 0755
+
 # these will be wildcard patterns, sort to remove duplicates
-SH_ETC	:= $(sort profile ksh.kshrc bashrc zshenv zprofile zshrc)
-SH_LOC	:= $(sort sh.* *sh.term.prompt)
-SH_USR	:= $(sort $(filter-out ksh.kshrc,$(SH_ETC)) \
-		bash_profile kshrc shrc *login *logout)
+sh_etc	:= $(sort profile ksh.kshrc bashrc kshrc shrc zshenv zprofile zshrc)
+sh_loc	:= $(sort sh.* env.local)
+sh_usr	:= $(sort $(filter-out ksh.kshrc, $(sh_etc)) \
+		bash_profile *login *logout)
 
-HOME_TGTS  := $(patsubst $(PRJDIR)/home/$(STYPE)/%, $(HOME)/.%, \
-	$(wildcard $(foreach pat,$(SH_USR),$(PRJDIR)/home/$(STYPE)/$(pat))))
-HOME_TGTS  += $(patsubst $(PRJDIR)/home/%, $(HOME)/.%, \
-	$(wildcard $(foreach pat,$(SH_USR),$(PRJDIR)/home/$(pat))))
+h_srcs	:= $(wildcard $(foreach pat, $(sh_usr), \
+		$(prjdir)/home/$(stype)/$(pat) \
+		$(prjdir)/home/$(pat) ))
 
-ROOT_TGTS  := $(patsubst $(PRJDIR)/root/$(STYPE)/etc/%, /etc/%, \
-	$(wildcard $(foreach pat,$(SH_ETC),$(PRJDIR)/root/$(STYPE)/etc/$(pat))))
-ROOT_TGTS  += $(patsubst $(PRJDIR)/root/etc/%, /etc/%, \
-	$(wildcard $(foreach pat,$(SH_ETC),$(PRJDIR)/root/etc/$(pat))))
-ROOT_TGTS  += $(patsubst $(PRJDIR)/root/$(STYPE)/usr/local/etc/%, /usr/local/etc/%, \
-	$(wildcard $(foreach pat,$(SH_LOC),$(PRJDIR)/root/$(STYPE)/usr/local/etc/$(pat))))
-ROOT_TGTS  += $(patsubst $(PRJDIR)/root/usr/local/etc/%, /usr/local/etc/%, \
-	$(wildcard $(foreach pat,$(SH_LOC),$(PRJDIR)/root/usr/local/etc/$(pat))))
-
-ifeq ($(PROF_D),true)
-ifneq ($(shell egrep -qw pathmunge /etc/profile.d/* 2>/dev/null || echo no),no)
-$(warning Files in /etc/profile.d use pathmunge)
+r_srcs	:= $(wildcard $(foreach pat, $(sh_etc), \
+		$(prjdir)/root/$(stype)/etc/$(pat) \
+		$(prjdir)/root/etc/$(pat) ))
+r_srcs	+= $(wildcard $(foreach pat, $(sh_loc), \
+		$(prjdir)/root/$(stype)/usr/local/etc/$(pat) \
+		$(prjdir)/root/usr/local/etc/$(pat) ))
+ifeq	($(prof_d),true)
+r_srcs	+= $(wildcard $(foreach pat, $(sh_loc), \
+		$(prjdir)/root/$(stype)/etc/profile.d/$(pat) \
+		$(prjdir)/root/etc/profile.d/$(pat) ))
 endif
-ROOT_TGTS  += $(patsubst $(PRJDIR)/root/$(STYPE)/etc/profile.d/%, /etc/profile.d/%, \
-	$(wildcard $(PRJDIR)/root/$(STYPE)/etc/profile.d/*))
-ROOT_TGTS  += $(patsubst $(PRJDIR)/root/etc/profile.d/%, /etc/profile.d/%, \
-	$(wildcard $(PRJDIR)/root/etc/profile.d/*))
-endif
+
+# pattern substitutions are nested to avoid system-specific
+# paths winding up as targets
+h_tgts	:= $(patsubst $(prjdir)/home/%, $(HOME)/.%, \
+		$(patsubst $(prjdir)/home/$(stype)/%, $(HOME)/.%, $(h_srcs)))
+
+r_tgts	:= $(patsubst $(prjdir)/root/%, /%, \
+		$(patsubst $(prjdir)/root/$(stype)/%, /%, $(r_srcs)))
+
+# r_tgts	:= $(patsubst $(prjdir)/root/$(stype)/etc/%, /etc/%, \
+# 	$(wildcard $(foreach pat,$(sh_etc),$(prjdir)/root/$(stype)/etc/$(pat))))
+# r_tgts	+= $(patsubst $(prjdir)/root/etc/%, /etc/%, \
+# 	$(wildcard $(foreach pat,$(sh_etc),$(prjdir)/root/etc/$(pat))))
+# r_tgts	+= $(patsubst $(prjdir)/root/$(stype)/usr/local/etc/%, /usr/local/etc/%, \
+# 	$(wildcard $(foreach pat,$(sh_loc),$(prjdir)/root/$(stype)/usr/local/etc/$(pat))))
+# r_tgts	+= $(patsubst $(prjdir)/root/usr/local/etc/%, /usr/local/etc/%, \
+# 	$(wildcard $(foreach pat,$(sh_loc),$(prjdir)/root/usr/local/etc/$(pat))))
+#
+# ifeq	($(prof_d),true)
+# r_tgts	+= $(patsubst $(prjdir)/root/$(stype)/etc/profile.d/%, /etc/profile.d/%, \
+# 	$(wildcard $(prjdir)/root/$(stype)/etc/profile.d/*))
+# r_tgts	+= $(patsubst $(prjdir)/root/etc/profile.d/%, /etc/profile.d/%, \
+# 	$(wildcard $(prjdir)/root/etc/profile.d/*))
+# endif
 
 # these will get symlinked if source files don't exist
-HOME_TGTS  += $(foreach fn, zprofile bashrc kshrc zshrc, $(HOME)/.$(fn))
-ROOT_TGTS  += $(foreach fn, , /etc/$(fn))
+# the definitive list is in the Makefile header
+
+h_tgts	+= $(foreach fn, bash_profile zprofile bashrc kshrc zshrc, $(HOME)/.$(fn))
+r_tgts	+= $(foreach fn, zprofile zshrc, /etc/$(fn))
 
 # sort to remove duplicates
-HOME_TGTS  := $(sort $(HOME_TGTS))
-ROOT_TGTS  := $(sort $(ROOT_TGTS))
+h_tgts  := $(sort $(h_tgts))
+r_tgts  := $(sort $(r_tgts))
 
-.PHONY: default home root
+.PHONY: default home root vars
 
-ifeq ($(NO_HOME),)
-default: home root
-else
-default: root
+ifeq	($(no_home),)
+default :: home
 endif
 
-ifneq ($(home_deprecated),)
+default :: root
+
+# for debugging
+vars ::
+	@$(MAKE) -Rrnp -C $(prjdir) \
+		| egrep '^[[:alnum:]_]+[[:space:]]*:?=' | sort
+
+ifneq	($(home_deprecated),)
 home ::
-	@echo Clean up manually with command:
+	@echo '***' Clean up manually with command:
 	@echo /bin/rm $(home_deprecated)
 endif
 
-ifneq ($(root_deprecated),)
+ifneq	($(root_deprecated),)
 root ::
-	@echo Clean up manually with command:
+	@echo '***' Clean up manually with command:
 	@echo /bin/rm $(root_deprecated)
 endif
 
-home :: $(HOME_TGTS)
-	@echo Home directory layout:
-	@/bin/ls -lh $(HOME)/.*rc $(HOME)/.*profile \
-		$(wildcard $(HOME)/.*login $(HOME)/.*logout)
+home :: $(h_tgts)
+	@echo '***' Home directory layout:
+	@/bin/ls -lh $(sort $(wildcard \
+		$(HOME)/.*shrc $(HOME)/.*profile \
+		$(HOME)/.*login $(HOME)/.*logout \
+		$(h_tgts) $(home_deprecated) ))
 
-root :: $(ROOT_TGTS)
+ifneq	($(uid),0)
+root ::
+	@echo '***' Root commands must be executed manually.
+endif
 
-/etc/% : $(PRJDIR)/root/$(STYPE)/etc/%
+root :: $(r_tgts)
+	@echo '***' Root directory layout:
+	@/bin/ls -lh $(sort $(wildcard $(r_tgts) $(root_deprecated)))
+
+# for each target directory, single-colon rules for the the
+# system-specific source first, then the generic source
+# gmake will use the first match only with single-colon rules
+
+/etc/% : $(prjdir)/root/$(stype)/etc/%
 	$(INSTSF) $< $@
 
-/etc/% : $(PRJDIR)/root/etc/%
+ifeq	($(prof_d),true)
+/etc/% : $(prjdir)/root/etc/%.profile.d
+	$(INSTSF) $< $@
+endif
+
+/etc/% : $(prjdir)/root/etc/%
 	$(INSTSF) $< $@
 
-/usr/local/etc/% : $(PRJDIR)/root/$(STYPE)/usr/local/etc/%
+/usr/local/etc/% : $(prjdir)/root/$(stype)/usr/local/etc/%
 	$(INSTSF) $< $@
 
-/usr/local/etc/% : $(PRJDIR)/root/usr/local/etc/%
+/usr/local/etc/% : $(prjdir)/root/usr/local/etc/%
 	$(INSTSF) $< $@
 
-$(HOME)/.% : $(PRJDIR)/home/$(STYPE)/%
+$(HOME)/.% : $(prjdir)/home/$(stype)/%
 	$(INSTUF) $< $@
 
-$(HOME)/.% : $(PRJDIR)/home/%
+$(HOME)/.% : $(prjdir)/home/%
 	$(INSTUF) $< $@
 
 # create symlinks for files that don't have sources
+# NO wildcards - too much chance to screw up!
+# the definitive list is in the Makefile header
 
 /etc/zprofile : /etc/profile
-	$(LNSYS) $(<F) $@
+	$(INSTSL) $(<F) $@
+
+/etc/zshrc : /etc/shrc
+	$(INSTSL) $(<F) $@
 
 $(HOME)/.bash_profile : $(HOME)/.profile
-	$(LNUSR) $(<F) $@
+	$(INSTUL) $(<F) $@
 
 $(HOME)/.zprofile : $(HOME)/.profile
-	$(LNUSR) $(<F) $@
+	$(INSTUL) $(<F) $@
 
 $(HOME)/.bashrc : $(HOME)/.shrc
-	$(LNUSR) $(<F) $@
+	$(INSTUL) $(<F) $@
 
 $(HOME)/.kshrc : $(HOME)/.shrc
-	$(LNUSR) $(<F) $@
+	$(INSTUL) $(<F) $@
 
 $(HOME)/.zshrc : $(HOME)/.shrc
-	$(LNUSR) $(<F) $@
+	$(INSTUL) $(<F) $@
 

@@ -96,18 +96,25 @@ then
 else
     __prf_sh=sh
 fi
-if [ -z "$SHELL" -o ! -f "$SHELL" ] \
-|| [ "$SHELL" != */$__prf_sh -a "$SHELL" != */r$__prf_sh ]
+set -x
+if [ -z "$SHELL" -o ! -f "$SHELL" ]
 then
-    for __prf in /bin/$__prf_sh /usr/bin/$__prf_sh `which $__prf_sh`
-    do
-        if [ -f "$__prf" -a -x "$__prf" ]
-        then
-            SHELL="$__prf"
-            export SHELL
-        fi
+    __prf_fn=`basename "$SHELL"`
+    if [ "$__prf_fn" != "$__prf_sh" -a "$__prf_fn" != "r$__prf_sh" ]
+    then
+        for __prf in /bin/$__prf_sh /usr/bin/$__prf_sh `which $__prf_sh`
+        do
+            if [ -f "$__prf" -a -x "$__prf" ]
+            then
+                SHELL="$__prf"
+                export SHELL
+                break
+            fi
+        done
     done
+    unset __prf_fn
 fi
+set +x
 
 # default Linux profiles source the shell rc file even in non-interactive
 # mode, but that's stupid and Homey don't play that game

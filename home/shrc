@@ -243,6 +243,147 @@ then
     }
 fi
 
+# copyright [path] [prefix]
+copyright()
+{
+    if [[ "$1" == '-h' || "$1" == '--help' || $# -gt 2 ]]
+    then
+        echo    'usage: copyright [path] [prefix|style]' >&2
+        echo    'note: if only one parameter is provided it will be treated as a prefix' >&2
+        echo    '      unless it contains a slash (/) preceeded by at least one non-slash' >&2
+        return  1
+    fi
+    __cpy_dir=''
+    __cpy_pre="$2"
+    __cpy_sty=''
+    __cpy_who=''
+    if [[ -n "$1" ]]
+    then
+        if [[ -d "$1" ]]
+        then
+            __cpy_dir="(cd "$1" && pwd)"
+        elif [[ "$1" == ?*/* && -d "${1%/*}" ]]
+        then
+            __cpy_dir="(cd "${1%/*}" && pwd)"
+        elif [[ $# -lt 2 ]]
+        then
+            __cpy_pre="$1"
+        fi
+    fi
+    [[ -n "$__cpy_dir" ]] || __cpy_dir="$(pwd)"
+    if [[ $# -eq 1 && -z "$__cpy_pre" ]]
+    then
+        case "${1##*/}" in
+            [cC]|*.c|*.h)
+                __cpy_sty=c
+                __cpy_pre=' *'
+                ;;
+            [cC][cC]|[cC][pP][pP]|*.cc|*.C|*.cpp|*.hh|*.H|*.hpp)
+                __cpy_sty=cc
+                __cpy_pre='//'
+                ;;
+            erl|*.erl|*.hrl)
+                __cpy_sty=erl
+                __cpy_pre='%%'
+                ;;
+            sh|*.mk|*.sh|Makefile)
+                __cpy_sty=sh
+                __cpy_pre='#'
+                ;;
+        esac
+    fi
+    if [[ -z "$__cpy_sty" ]]
+    then
+        case "$__cpy_pre" in
+            [cC])
+                __cpy_sty=c
+                __cpy_pre=' *'
+                ;;
+            [cC][cC]|[cC][pP][pP])
+                __cpy_sty=cc
+                __cpy_pre='//'
+                ;;
+            erl)
+                __cpy_sty=erl
+                __cpy_pre='%%'
+                ;;
+            sh)
+                __cpy_sty=sh
+                __cpy_pre='#'
+                ;;
+        esac
+    fi
+    if [[ -n "$__cpy_dir" ]]
+    then
+        if [[ -n "$BASHO_PRJ_BASE" \
+        && "${__cpy_dir#${BASHO_PRJ_BASE}}" != "$__cpy_dir" ]]
+        then
+            __cpy_who='basho'
+        elif [[ -n "$TRB_PRJ_BASE" \
+        && "${__cpy_dir#${TRB_PRJ_BASE}}" != "$__cpy_dir" ]]
+        then
+            __cpy_who='T. R. Burghart'
+        fi
+    fi
+    case "$__cpy_sty" in
+        c)
+            printf '%s\n' '/*'
+            ;;
+    esac
+    case "$__cpy_who" in
+        basho)
+            __cpy_ln='-------------------------------------------------------------------'
+            printf '%s %s\n' "$__cpy_pre" "$__cpy_ln"
+            printf '%s\n' "$__cpy_pre"
+            printf '%s Copyright (c) %u Basho Technologies, Inc.\n' "$__cpy_pre" "$(date '+%Y')"
+            printf '%s\n' "$__cpy_pre"
+            printf '%s This file is provided to you under the Apache License,\n' "$__cpy_pre"
+            printf '%s Version 2.0 (the "License"); you may not use this file\n' "$__cpy_pre"
+            printf '%s except in compliance with the License.  You may obtain\n' "$__cpy_pre"
+            printf '%s a copy of the License at\n' "$__cpy_pre"
+            printf '%s\n' "$__cpy_pre"
+            printf '%s   http://www.apache.org/licenses/LICENSE-2.0\n' "$__cpy_pre"
+            printf '%s\n' "$__cpy_pre"
+            printf '%s Unless required by applicable law or agreed to in writing,\n' "$__cpy_pre"
+            printf '%s software distributed under the License is distributed on an\n' "$__cpy_pre"
+            printf '%s "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY\n' "$__cpy_pre"
+            printf '%s KIND, either express or implied.  See the License for the\n' "$__cpy_pre"
+            printf '%s specific language governing permissions and limitations\n' "$__cpy_pre"
+            printf '%s under the License.\n' "$__cpy_pre"
+            printf '%s\n' "$__cpy_pre"
+            printf '%s %s\n' "$__cpy_pre" "$__cpy_ln"
+            ;;
+        *)
+            [[ -n "$__cpy_who" ]] || __cpy_who="${LOGNAME:-${USER:-$(id -un)}}"
+            __cpy_ln='========================================================================'
+            printf '%s %s\n' "$__cpy_pre" "$__cpy_ln"
+            printf '%s Copyright (c) %u %s\n' "$__cpy_pre" "$(date '+%Y')" "$__cpy_who"
+            printf '%s\n' "$__cpy_pre"
+            printf '%s Permission to use, copy, modify, and/or distribute this software for any\n' "$__cpy_pre"
+            printf '%s purpose with or without fee is hereby granted, provided that the above\n' "$__cpy_pre"
+            printf '%s copyright notice and this permission notice appear in all copies.\n' "$__cpy_pre"
+            printf '%s\n' "$__cpy_pre"
+            printf '%s THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES\n' "$__cpy_pre"
+            printf '%s WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF\n' "$__cpy_pre"
+            printf '%s MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR\n' "$__cpy_pre"
+            printf '%s ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES\n' "$__cpy_pre"
+            printf '%s WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN\n' "$__cpy_pre"
+            printf '%s ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF\n' "$__cpy_pre"
+            printf '%s OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.\n' "$__cpy_pre"
+            printf '%s %s\n' "$__cpy_pre" "$__cpy_ln"
+            ;;
+        *)
+            printf '%s\n' "$__cpy_pre"
+            ;;
+    esac
+    case "$__cpy_sty" in
+        c)
+            printf '%s\n' ' */'
+            ;;
+    esac
+    unset   __cpy_dir __cpy_ln __cpy_pre __cpy_sty __cpy_who
+}
+
 # Find Here Or Above
 fhoa()
 {
@@ -423,55 +564,57 @@ cdl()
 
 newscr()
 {
-    u='usage: newscr interpretter target-file'
     if [[ $# -ne 2 ]]
     then
-        echo "$u" >&2
-        unset u
-        return 1
+        echo    'usage: newscr interpretter target-file' >&2
+        return  1
     fi
-    e=''
-    s="$(/usr/bin/which "$1")"
-    if [[ -z "$s" ]]
+    if [[ -e "$2" ]]
     then
-        e="interpretter '$1' not found"
+        echo    "error: newscr: '$2' already exists!" >&2
+        return  1
+    fi
+    if [[ "$1" == 'escript' || "$1" == 'erl' ]]
+    then
+        s='escript'
     else
-        if [[ -e "$2" ]]
-        then
-            e="'$2' already exists!"
-        else
-            e="$(/usr/bin/touch "$2" 2>&1)"
-            if [[ -z "$e" ]]
-            then
-                case "${s##*/}" in
-                    escript )
-                        printf '#!/usr/bin/env escript\n' > "$2"
-                        printf '%% -*- erlang -*-\n' >> "$2"
-                        printf '%%! -smp enable +K true -sname %s\n' "${2##*/}" >> "$2"
-                        ;;
-                    bash | ksh | sh | zsh )
-                        printf '#!%s -e -x\n\n' "$s" > "$2"
-                        printf 'readonly  sdir="$(cd "$(dirname "$0")" && pwd)"\n' >> "$2"
-                        printf 'readonly  sname="${0##*/}"\n' >> "$2"
-                        printf 'readonly  spath="$sdir/$sname"\n' >> "$2"
-                        ;;
-                    * )
-                        printf '#!%s\n' "$s" > "$2"
-                        ;;
-                esac
-                printf '\n\n' >> "$2"
-                /bin/chmod +x "$2"
-            fi
-        fi
-    fi 
+        for s in "/bin/$1" "/usr/bin/$1" \
+            "$(which "$1" 2>/dev/null)" "/usr/bin/env $1"
+        do
+            [[ -z "$s" || ! -f "$s" || ! -x "$s" ]] || break
+        done
+    fi
+    e="$(/usr/bin/touch "$2" 2>&1)"
     if [[ -n "$e" ]]
     then
-        echo "error: newscr: $e" >&2
-        echo "$u" >&2
-        unset e s u
-        return 1
+        echo    "error: newscr: ${e#touch: }" >&2
+        unset   e s
+        return  1
     fi
-    unset e s u
+    case "${s##*/}" in
+        escript )
+            printf '#!/usr/bin/env escript\n' > "$2"
+            printf '%%%% -*- mode: erlang; erlang-indent-level: 4; indent-tabs-mode: nil -*-\n' >> "$2"
+            printf '%%%%! -smp enable +K true -sname %s\n' "${2##*/}" >> "$2"
+            copyright "$2" erl >> "$2"
+            printf '\nmain(Args) ->\n    ok.\n' >> "$2"
+            ;;
+        bash | ksh | sh | zsh )
+            printf '#!%s -e\n' "$s" > "$2"
+            copyright "$2" sh >> "$2"
+            printf '\n' >> "$2"
+            printf 'readonly  rdir="$(pwd)"\n' >> "$2"
+            printf 'readonly  sdir="$(cd "$(dirname "$0")" && pwd)"\n' >> "$2"
+            printf 'readonly  sname="${0##*/}"\n' >> "$2"
+            printf 'readonly  spath="$sdir/$sname"\n' >> "$2"
+            printf '\nset -x\n' >> "$2"
+            ;;
+        * )
+            printf '#!%s\n' "$s" > "$2"
+            ;;
+    esac
+    printf '\n\n' >> "$2"
+    /bin/chmod +x "$2"
 }
 
 giga()
@@ -555,9 +698,18 @@ alias shconf="m ~/.shrc"
 alias shrc=". ~/.shrc"
 alias b="cd $BASHO_PRJ_BASE"
 alias e="$MATE"
-alias ideaerls="m ~/Library/Preferences/IdeaIC14/options/jdk.table.xml"
-alias ideadirs="/usr/bin/find ~/prj -type d -name .idea && echo ~/Library/Preferences/IdeaIC14/options/jdk.table.xml"
 alias t="cd $TRB_PRJ_BASE"
+
+# Idea IDE(s)
+__shrc_ideajdks="$(/bin/ls -1d \
+    ~/Library/Preferences/IdeaIC*/options/jdk.table.xml 2>/dev/null \
+    | tail -1)"
+if [[ -n "$__shrc_ideajdks" && -f "$__shrc_ideajdks" ]]
+then
+    alias ideaerls="m $__shrc_ideajdks"
+    alias ideadirs="/usr/bin/find ~/prj -type d -name .idea && echo $__shrc_ideajdks"
+fi
+unset __shrc_ideajdks
 
 # Dates
 alias utcs="date '+%s'"
@@ -689,18 +841,23 @@ alias we='whence erl'
 
 _shrc_cmd_files()
 {
-    __scf_le="${LOCAL_ENV_DIR%/*}"
-    if [[ "$(pwd)" == "$__scf_le" || "$(pwd)" == "$__scf_le"/* ]]
+    if [[ -n "$LOCAL_ENV_DIR" ]]
     then
-        /bin/ls $__scf_le/home/shrc \
-            $__scf_le/root/usr/local/etc/sh.* \
-            $__scf_le/root/$(uname -s \
-                | tr '[A-Z]' '[a-z]')/usr/local/etc/sh.* \
-            2>/dev/null
-    else
-        /bin/ls $HOME/.shrc /usr/local/etc/sh.* 2>/dev/null
+        __scf_le="${LOCAL_ENV_DIR%/*}"
+        __scf_wd="$(pwd)"
+        if [[ "$__scf_wd" == "$__scf_le" || "$__scf_wd" == "$__scf_le"/* ]]
+        then
+            /bin/ls $__scf_le/home/shrc \
+                $__scf_le/root/usr/local/etc/sh.* \
+                $__scf_le/root/$(uname -s \
+                    | tr '[A-Z]' '[a-z]')/usr/local/etc/sh.* \
+                2>/dev/null
+            unset __scf_le __scf_wd
+            return 0
+        fi
+        unset __scf_le __scf_wd
     fi
-    unset __scf_le
+    /bin/ls $HOME/.shrc /usr/local/etc/sh.* 2>/dev/null
 }
 shrc_cmd_names()
 {

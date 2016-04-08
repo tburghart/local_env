@@ -34,20 +34,35 @@ then
 fi
 unset_vars='shell shome stype mtype usern'
 
-BASHO_PRJ_BASE="$HOME/prj/basho"
-TRB_PRJ_BASE="$HOME/prj/tedb"
+otp_check='/opt/basho /opt/local /usr/local'
+unset_vars="$unset_vars otp_check"
 
-ledir="$TRB_PRJ_BASE/local_env"
-LOCAL_ENV_DIR="$ledir/env"
-unset_vars="$unset_vars ledir"
+if [[ -d "$HOME/prj/basho" ]]
+then
+    BASHO_PRJ_BASE="$HOME/prj/basho"
+    export BASHO_PRJ_BASE
+    otp_check+=" $BASHO_PRJ_BASE/local"
+fi
+if [[ -d "$HOME/prj/tedb" ]]
+then
+    TRB_PRJ_BASE="$HOME/prj/tedb"
+    export TRB_PRJ_BASE
+    otp_check+=" $TRB_PRJ_BASE/local"
 
-for LOCAL_OTP_DIR in \
-    '/opt/basho' '/opt/local' '/usr/local' \
-    "$BASHO_PRJ_BASE/local" "$TRB_PRJ_BASE/local" "$HOME/local"
+    if [[ -d "$TRB_PRJ_BASE/local_env" ]]
+    then
+        ledir="$TRB_PRJ_BASE/local_env"
+        unset_vars="$unset_vars ledir"
+        LOCAL_ENV_DIR="$ledir/env"
+        export LOCAL_ENV_DIR
+    fi
+fi
+
+for LOCAL_OTP_DIR in $otp_check $HOME/local
 do
-    if [[ -d "$LOCAL_OTP_DIR" && -w "$LOCAL_OTP_DIR" ]] ; then break ; fi
+    [[ ! -d "$LOCAL_OTP_DIR" || ! -w "$LOCAL_OTP_DIR" ]] || break
 done
-export BASHO_PRJ_BASE TRB_PRJ_BASE LOCAL_ENV_DIR LOCAL_OTP_DIR
+export LOCAL_OTP_DIR
 
 pathbeg="$ledir /usr/local /opt/local"
 if [[ "$stype" == 'SunOS' ]]

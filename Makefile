@@ -91,7 +91,7 @@ prof_d	:= false
 endif
 
 # counting on this unlinking the destination file before copying
-INSTALL	:= /usr/bin/install -cp
+INSTALL	:= /usr/bin/install
 
 INSTSYS	:= $(INSTALL) -o 0 -g 0
 INSTUSR	:= $(INSTALL) -o $(uid) -g $(gid)
@@ -140,22 +140,6 @@ h_tgts	:= $(patsubst $(prjdir)/home/%, $(HOME)/.%, \
 
 r_tgts	:= $(patsubst $(prjdir)/root/%, /%, \
 		$(patsubst $(prjdir)/root/$(stype)/%, /%, $(r_srcs)))
-
-# r_tgts	:= $(patsubst $(prjdir)/root/$(stype)/etc/%, /etc/%, \
-# 	$(wildcard $(foreach pat,$(sh_etc),$(prjdir)/root/$(stype)/etc/$(pat))))
-# r_tgts	+= $(patsubst $(prjdir)/root/etc/%, /etc/%, \
-# 	$(wildcard $(foreach pat,$(sh_etc),$(prjdir)/root/etc/$(pat))))
-# r_tgts	+= $(patsubst $(prjdir)/root/$(stype)/usr/local/etc/%, /usr/local/etc/%, \
-# 	$(wildcard $(foreach pat,$(sh_loc),$(prjdir)/root/$(stype)/usr/local/etc/$(pat))))
-# r_tgts	+= $(patsubst $(prjdir)/root/usr/local/etc/%, /usr/local/etc/%, \
-# 	$(wildcard $(foreach pat,$(sh_loc),$(prjdir)/root/usr/local/etc/$(pat))))
-#
-# ifeq	($(prof_d),true)
-# r_tgts	+= $(patsubst $(prjdir)/root/$(stype)/etc/profile.d/%, /etc/profile.d/%, \
-# 	$(wildcard $(prjdir)/root/$(stype)/etc/profile.d/*))
-# r_tgts	+= $(patsubst $(prjdir)/root/etc/profile.d/%, /etc/profile.d/%, \
-# 	$(wildcard $(prjdir)/root/etc/profile.d/*))
-# endif
 
 # these will get symlinked if source files don't exist
 # the definitive list is in the Makefile header

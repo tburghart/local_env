@@ -406,8 +406,7 @@ lenv()
             reset_lenv
             unset lenv_current
         else
-            [[ "$lenv_current" = "$(pwd)" ]] || \
-                echo loaded environment from "'$lenv_current'"
+            echo loaded environment from "'$lenv_current'"
         fi
         unset lenv_result
     else

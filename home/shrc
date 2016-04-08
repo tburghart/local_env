@@ -243,18 +243,24 @@ then
     }
 fi
 
-find_here_or_above()
+# Find Here Or Above
+fhoa()
 {
     if [[ $# -lt 1 ]]
     then
-        echo 'usage: find_here_or_above <filename> [<highest-dir>]' >&2
+        echo 'usage: fhoa <name> [<highest-dir>]' >&2
         return 1
+    fi
+    if [[ -e "$1" ]]
+    then
+        echo "$(pwd)/$1"
+        return 0
     fi
     if [[ -n "$2" ]]
     then
         if [[ ! -d "$2" ]]
         then
-            echo "error: find_here_or_above: '$2' is not a directory"
+            echo "error: fhoa: '$2' is not a directory"
             return 1
         fi
         t="$(cd "$2" && pwd)"
@@ -262,14 +268,14 @@ find_here_or_above()
         t="$HOME"
     fi
     c="$(pwd)"
-    if [[ "$c" != "$t" && "${c#${t}/}" == "$c" ]]
+    if [[ "$c" != "$t" && "${c#${t}/}" = "$c" ]]
     then
         unset c t
         return 2
     fi
     while true
     do
-        if [[ -f "$c/$1" ]]
+        if [[ -e "$c/$1" ]]
         then
             echo "$c/$1"
             unset c t
@@ -320,13 +326,9 @@ lenm()
     fi
 }
 
-# s/ss format
-env_ss_format_default='    %-11s %s\n'
-env_ss_format="$env_ss_format_default"
-
 lenv()
 {
-    lenv_target="$(pwd)"
+    lenv_target="$(fhoa $lenv_file 2>/dev/null || true)"
     case "$(typeof reset_lenv)" in
         undefined )
             if [[ -n "$reset_lenv" ]]
@@ -355,24 +357,21 @@ lenv()
         unalias $lenv_aliases 2>/dev/null
         unset lenv_aliases
     fi
-    if [[ -n "$lenv_envvars" ]]
-    then
-        unset $lenv_envvars 2>/dev/null
-        unset lenv_envvars
-    fi
+    [[ -z "$lenv_envvars" ]] || unset $lenv_envvars lenv_envvars
     env_ss_format="$env_ss_format_default"
 
-    if [[ -f "$lenv_target/$lenv_file" ]]
+    if [[ -f "$lenv_target" ]]
     then
-        . "$lenv_target/$lenv_file"
+        . "$lenv_target"
         lenv_result=$?
         unset $env_local_unset env_local_unset \
-            $(set | $ESED -n 's/^(local_[[:alnum:]_]+)=.*$/\1/p' | tr '\n' ' ')
+            $(set | $ESED -n 's/^(local_[[:alnum:]_]+)=.*$/\1/p' | tr '\n' ' ') \
+            2>/dev/null
         if [[ $lenv_result -ne 0 && "$(typeof reset_lenv)" != undefined ]]
         then
             reset_lenv
         fi
-        lenv_current="$lenv_target"
+        lenv_current="${lenv_target%/*}"
         if [[ "$(typeof reset_lenv)" == undefined && -z "$reset_lenv" ]]
         then
             reset_lenv()
@@ -396,11 +395,8 @@ lenv()
                     unset -f $env_reset_unsetf 2>/dev/null
                     unset env_reset_unsetf
                 fi
-                if [[ -n "$env_reset_unset" ]]
-                then
-                    unset $env_reset_unset 2>/dev/null
-                    unset env_reset_unset
-                fi
+                [[ -z "$env_reset_unset" ]] || unset $env_reset_unset env_reset_unset
+
                 env_ss_format="$env_ss_format_default"
                 unset -f reset_lenv
             }
@@ -409,10 +405,13 @@ lenv()
         then
             reset_lenv
             unset lenv_current
+        else
+            [[ "$lenv_current" = "$(pwd)" ]] || \
+                echo loaded environment from "'$lenv_current'"
         fi
         unset lenv_result
     else
-        unset lenv_current 2>/dev/null
+        [[ -z "$lenv_current" ]] || unset lenv_current
     fi
     unset lenv_target
 }
@@ -689,15 +688,80 @@ alias r18=". $LOCAL_OTP_DIR/otp-18/activate"
 alias unkerl='kerl_deactivate'
 alias we='whence erl'
 
-#
-# get this list with:
-#
-#   cat ~/.shrc /usr/local/etc/sh.* | $ESED -n "s/^[[:space:]]*(alias[[:space:]]+([[:alnum:]_-]+)=.*|([[:alnum:]_]+)\\(\\)[[:space:]]*)\$/    echo '    \\2\\3 '/p" | sort -u
-#
-# or just the missing ones:
-#
-#   cat ~/.shrc /usr/local/etc/sh.* | $ESED -n "s/^[[:space:]]*(alias[[:space:]]+([[:alnum:]_-]+)=.*|([[:alnum:]_]+)\\(\\)[[:space:]]*)\$/\\2\\3/p" | sort -u | while read n ; do egrep -q "^[[:space:]]+echo[[:space:]]+'[[:space:]]*$n[[:space:]]" ~/.shrc || echo "    echo '    $n '" ; done
-#
+_shrc_cmd_files()
+{
+    __scf_le="${LOCAL_ENV_DIR%/*}"
+    if [[ "$(pwd)" == "$__scf_le" || "$(pwd)" == "$__scf_le"/* ]]
+    then
+        /bin/ls $__scf_le/home/shrc \
+            $__scf_le/root/usr/local/etc/sh.* \
+            $__scf_le/root/$(uname -s \
+                | tr '[A-Z]' '[a-z]')/usr/local/etc/sh.* \
+            2>/dev/null
+    else
+        /bin/ls $HOME/.shrc /usr/local/etc/sh.* 2>/dev/null
+    fi
+    unset __scf_le
+}
+shrc_cmd_names()
+{
+    __scn_re='s/^[[:space:]]*(alias[[:space:]]+([[:alnum:]_-]+)=.*|([[:alnum:]][[:alnum:]_]*)\(\)[[:space:]]*)$/\2\3/p'
+    if [[ $# -gt 0 ]]
+    then
+        cat "$@" | $ESED -n "$__scn_re" | sort -u
+    else
+        cat $(_shrc_cmd_files) | $ESED -n "$__scn_re" | sort -u
+    fi
+    unset __scn_re
+}
+shrc_cmds()
+{
+    printf "    printf \"\$env_ss_format\" '%s' ''\\n" $(shrc_cmd_names "$@")
+}
+shrc_missing()
+{
+    if [[ $# -gt 0 ]]
+    then
+        __sm_fl="$*"
+    else
+        __sm_fl="$(_shrc_cmd_files)"
+    fi
+    __sm_pf="    printf \"\$env_ss_format\" '%s' ''\\n"
+    S='[:space:]'
+    for __sm_cn in $(shrc_cmd_names $__sm_fl)
+    do
+        if ! $EGREP -q \
+            "^[$S]+printf[$S]+\"\\\$env_ss_format\"[$S]+'$__sm_cn'[$S]+" \
+            $__sm_fl
+        then
+            printf "$__sm_pf" "$__sm_cn"
+        fi
+    done
+    unset __sm_fl __sm_pf S
+}
+shrc_longest()
+{
+    __sl_ln=0
+    __sl_lc=''
+    for __sl_cn in $(shrc_cmd_names "$@")
+    do
+        __sl_cl="${#__sl_cn}"
+        if [[ $__sl_cl -gt $__sl_ln ]]
+        then
+            __sl_ln=$__sl_cl
+            __sl_lc="$__sl_cn"
+        fi
+    done
+    printf "longest command '%s': %u\\n" "$__sl_lc" $__sl_ln
+    unset __sl_cl __sl_cn __sl_lc __sl_ln
+}
+
+# s/ss format
+env_ss_format_format="    %%-%us %%s\\\\n"
+env_ss_length_default=15
+env_ss_format_default="$(printf "$env_ss_format_format" $env_ss_length_default)"
+env_ss_format="$env_ss_format_default"
+
 ss()
 {
     printf "$env_ss_format" 'aws-scp' 'scp with aws identity'
@@ -711,8 +775,10 @@ ss()
     printf "$env_ss_format" 'lat' 'ls -lhAtr'
     printf "$env_ss_format" 'lh' 'ls -lhH'
     printf "$env_ss_format" 'll' 'ls -lh'
+    printf "$env_ss_format" 'lla' 'ls -lh + EAs'
     printf "$env_ss_format" 'lld' 'ls -lhd'
-    printf "$env_ss_format" 'lll' 'ls -lho@'
+    printf "$env_ss_format" 'llf' 'ls -lh + flags'
+    printf "$env_ss_format" 'lll' 'ls -lh + flags & EAs'
     printf "$env_ss_format" 'lr' 'ls -lhR'
     printf "$env_ss_format" 'lt' 'ls -lhtr'
     echo ''
@@ -755,11 +821,24 @@ ss()
     printf "$env_ss_format" 'df' 'df -h'
     printf "$env_ss_format" 'dircp' 'copy directory with pax'
     printf "$env_ss_format" 'dirpath' 'echo the fully-qualified directory name of the argument'
-    printf "$env_ss_format" 'dscl' 'dscl -raw .'
-    printf "$env_ss_format" 'ideadirs' 'list idea project and preferences directories'
-    printf "$env_ss_format" 'ideaerls' 'edit idea Erlang (JDK) table'
+    if [[ "$(typeof dscl)" != 'undefined' ]]
+    then
+        printf "$env_ss_format" 'dscl' 'dscl -raw .'
+    fi
+    printf "$env_ss_format" 'ecp' 'cp -p without EAs'
+    printf "$env_ss_format" 'egrep' 'grep with EREs'
+    printf "$env_ss_format" 'esed' 'sed with EREs'
+    printf "$env_ss_format" 'fhoa' '<name> [<highest-dir>]  locate $name in pwd up to highest/$HOME'
+    if [[ "$(typeof ideadirs)" != 'undefined' ]]
+    then
+        printf "$env_ss_format" 'ideadirs' 'list idea project and preferences directories'
+        printf "$env_ss_format" 'ideaerls' 'edit idea Erlang (JDK) table'
+    fi
     printf "$env_ss_format" 'isvar' 'is argument an environment variable'
-    printf "$env_ss_format" 'lchflags' 'chflags -h'
+    if [[ "$(typeof lchflags)" != 'undefined' ]]
+    then
+        printf "$env_ss_format" 'lchflags' 'chflags -h'
+    fi
     printf "$env_ss_format" 'ldd' 'list dynamic lib dependencies'
     printf "$env_ss_format" 'newbash' '<path>  create a bash executable script'
     printf "$env_ss_format" 'newes' '<path>  create an escript executable script'
@@ -767,21 +846,46 @@ ss()
     printf "$env_ss_format" 'newscr' '<interpretter> <path>  create an executable script'
     printf "$env_ss_format" 'newsh' '<path>  create a sh executable script'
     printf "$env_ss_format" 'newzsh' '<path>  create a zsh executable script'
-    printf "$env_ss_format" 'pldump' '<path>  dump plist file as xml'
+    if [[ "$(typeof pldump)" != 'undefined' ]]
+    then
+        printf "$env_ss_format" 'pldump' '<path>  dump plist file as xml'
+    fi
     printf "$env_ss_format" 'remake' 'make clean && make'
     printf "$env_ss_format" 'rp' 'ruby tutorial'
     printf "$env_ss_format" 'rtconf' 'edit riak_test config'
     printf "$env_ss_format" 'typeof' 'type of command argument is interpretted as'
-    printf "$env_ss_format" 'unhide' 'chflags -h nohidden'
+    if [[ "$(typeof unhide)" != 'undefined' ]]
+    then
+        printf "$env_ss_format" 'unhide' 'chflags -h nohidden'
+    fi
     printf "$env_ss_format" 'utcs' 'print current time as UTC seconds'
     printf "$env_ss_format" 'utcs2d' '<UtcSecs>  print default time string'
+    if [[ "$(typeof wget)" == 'alias' ]]
+    then
+        printf "$env_ss_format" 'wget' 'curl --remote-name-all'
+    fi
     printf "$env_ss_format" 'whence' 'ksh-like whence'
     printf "$env_ss_format" 'whereis' 'find all instances of command'
     echo ''
     printf "$env_ss_format" 'cdl' 'cd && lenv'
+    printf "$env_ss_format" 'lenm' 'display loaded custom environment name or path'
     printf "$env_ss_format" 'lenv' '[re]load custom environment for current or parent directory'
+    printf "$env_ss_format" 'reset_lenv' 'unload current custom environment'
+    printf "$env_ss_format" 'sss' 'display environment maintenance commands'
+    printf "$env_ss_format" 'ss' 'display global environment commands'
+    if [[ "$(typeof s)" != 'undefined' ]]
+    then
+        printf "$env_ss_format" 's' 'display custom environment commands'
+    fi
+    echo ''
+}
+
+sss()
+{
+    printf "$env_ss_format" 'shrc_cmd_names' '[files ...]  list all environment command names'
+    printf "$env_ss_format" 'shrc_cmds' '[files ...]  list all potential s/ss entries'
+    printf "$env_ss_format" 'shrc_longest' '[files ...]  calculate longest environment command name length'
+    printf "$env_ss_format" 'shrc_missing' '[files ...]  list missing s/ss entries'
     printf "$env_ss_format" 'shconf' 'edit shell rc'
     printf "$env_ss_format" 'shrc' 'reload shell rc'
-    printf "$env_ss_format" 'ss' 'display this list'
-    echo ''
 }

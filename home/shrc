@@ -839,6 +839,11 @@ alias r18=". $LOCAL_OTP_DIR/otp-18/activate"
 alias unkerl='kerl_deactivate'
 alias we='whence erl'
 
+if [[ -f "$TRB_PRJ_BASE/basho/erl_stuff/src/rebar_deps.erl" ]]
+then
+    alias rdeps="escript $TRB_PRJ_BASE/basho/erl_stuff/src/rebar_deps.erl"
+fi
+
 _shrc_cmd_files()
 {
     if [[ -n "$LOCAL_ENV_DIR" ]]
@@ -973,6 +978,7 @@ ss()
     printf "$env_ss_format" 'unkerl' 'kerl_deactivate'
     echo ''
     printf "$env_ss_format" 'chdir' 'same as cd'
+    printf "$env_ss_format" 'copyright' '[path] [prefix|style]  write a copyright header to stdout'
     printf "$env_ss_format" 'd2utcs' '<DateTime>  parse default time string to UTC seconds'
     printf "$env_ss_format" 'df' 'df -h'
     printf "$env_ss_format" 'dircp' 'copy directory with pax'
@@ -1005,6 +1011,10 @@ ss()
     if [[ "$(typeof pldump)" != 'undefined' ]]
     then
         printf "$env_ss_format" 'pldump' '<path>  dump plist file as xml'
+    fi
+    if [[ "$(typeof rdeps)" != 'undefined' ]]
+    then
+        printf "$env_ss_format" 'rdeps' '[-h|options]  write rebar dependencies'
     fi
     printf "$env_ss_format" 'remake' 'make clean && make'
     printf "$env_ss_format" 'rp' 'ruby tutorial'

@@ -683,6 +683,11 @@ m()
     fi
 }
 
+if [[ -n "$LOCAL_ENV_DIR" && -d "$LOCAL_ENV_DIR/.." ]]
+then
+    alias le="cd $LOCAL_ENV_DIR/.."
+fi
+
 # SSH
 alias aws-scp='/usr/bin/scp -p -i /Users/ted/.aws/aws.ssh.1.pem'
 alias aws-ssh='/usr/bin/ssh -R 52698:localhost:52698 -i /Users/ted/.aws/aws.ssh.1.pem'
@@ -1048,6 +1053,10 @@ ss()
 
 sss()
 {
+    if [[ "$(typeof le)" != 'undefined' ]]
+    then
+        printf "$env_ss_format" 'le' 'cd local environment base directory'
+    fi
     printf "$env_ss_format" 'shrc_cmd_names' '[files ...]  list all environment command names'
     printf "$env_ss_format" 'shrc_cmds' '[files ...]  list all potential s/ss entries'
     printf "$env_ss_format" 'shrc_longest' '[files ...]  calculate longest environment command name length'

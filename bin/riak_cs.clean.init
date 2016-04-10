@@ -83,11 +83,10 @@ readonly  db_alt='2.0'
 readonly  suffix_elems=2
 
 #
-# Change to 'master' once 'basho-trb-node_package-change' is merged.
 # It would be nice to match this to the Riak version, but the CS harness
 # uses features only in the master branch as of now.
 #
-readonly  rt_spec='basho-trb-node_package-change'
+readonly  rt_spec='master'
 
 #
 # Which OTP builds to use.
@@ -101,7 +100,7 @@ readonly  prev_otp_activate='/opt/basho/otp-15-p1/activate'
 #
 # Old source directories that will be DELETED ENTIRELY if found.
 #
-readonly  old_srcs='riak riak_ee riak_cs stanchion'
+readonly  old_srcs='riak riak_cs riak_ee riak_test stanchion'
 
 #
 # About this script.
@@ -561,10 +560,10 @@ then
     done
 fi
 
-safe_repo_rm "$CS_TOP_DIR/riak_test"
+safe_repo_rm "$CS_TOP_DIR/riak_test-cs"
 $GIT clone -b "$rt_spec" \
-    'git@github.com:basho/riak_test.git' "$CS_TOP_DIR/riak_test"
-cd "$CS_TOP_DIR/riak_test"
+    'git@github.com:basho/riak_test.git' "$CS_TOP_DIR/riak_test-cs"
+cd "$CS_TOP_DIR/riak_test-cs"
 $MAKE
 
 for dir in $rt_roots

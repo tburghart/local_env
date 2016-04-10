@@ -849,13 +849,22 @@ then
     alias rdeps="escript $TRB_PRJ_BASE/basho/erl_stuff/src/rebar_deps.erl"
 fi
 
+lel()
+{
+    if [[ -n "$env_reset_unset" ]]
+    then
+        env | $EGREP "^($(echo $(printf '%s\n' $env_reset_unset \
+            | $EGREP '^[[:upper:]]' | sort -u) | tr ' ' '|'))" | sort
+    fi
+}
+
 _shrc_cmd_files()
 {
     if [[ -n "$LOCAL_ENV_DIR" ]]
     then
         __scf_le="${LOCAL_ENV_DIR%/*}"
         __scf_wd="$(pwd)"
-        if [[ "$__scf_wd" == "$__scf_le" || "$__scf_wd" == "$__scf_le"/* ]]
+        if [[ "$__scf_wd/" == "$__scf_le/"* ]]
         then
             /bin/ls $__scf_le/home/shrc \
                 $__scf_le/root/usr/local/etc/sh.* \
@@ -867,7 +876,7 @@ _shrc_cmd_files()
         fi
         unset __scf_le __scf_wd
     fi
-    /bin/ls $HOME/.shrc /usr/local/etc/sh.* 2>/dev/null
+    /bin/ls $HOME/.shrc /usr/local/etc/sh.* 2>/dev/null || true
 }
 shrc_cmd_names()
 {
@@ -1039,6 +1048,7 @@ ss()
     printf "$env_ss_format" 'whereis' 'find all instances of command'
     echo ''
     printf "$env_ss_format" 'cdl' 'cd && lenv'
+    printf "$env_ss_format" 'lel' 'List Exported Local environment variables'
     printf "$env_ss_format" 'lenm' 'display loaded custom environment name or path'
     printf "$env_ss_format" 'lenv' '[re]load custom environment for current or parent directory'
     printf "$env_ss_format" 'reset_lenv' 'unload current custom environment'

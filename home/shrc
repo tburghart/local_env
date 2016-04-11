@@ -831,9 +831,12 @@ gy()
         echo 'Usage: gy <exactly-one-file-path>' >&2
         return 1
     fi
-    $GIT log --no-decorate -- "$1" \
+    __gy_cwd="$(pwd)"
+    cd "$(dirname "$1")" && $GIT log --no-decorate -- "$(basename "$1")" \
     | $ESED -n 's/^Date:.* ([12][9012][0-9][0-9]) .*$/\1/p' \
     | /usr/bin/sort -u
+    cd "$__gy_cwd"
+    unset __gy_cwd
 }
 
 # Erlang

@@ -18,26 +18,26 @@
 # maybe tell the terminal program where we are
 #
 
-if [ -n "$BASH_VERSION" ]
-then
-    [[ -n "$PS1" ]] || return
-    shell=bash
-    func=true
-
-elif [ -n "$KSH_VERSION" ]
-then
-    [[ -n "$PS1" ]] || return
-    shell=ksh
-    func=true
-
-elif [ -n "$ZSH_VERSION" ]
+if [ -n "$ZSH_VERSION" ]
 then
     [[ -o interactive ]] || return
     shell=zsh
     func=true
 
+elif [ -n "$BASH_VERSION" ]
+then
+    [[ -n "$PS1" || -n "$__sh_interactive" || "$-" == *i* ]] || return
+    shell=bash
+    func=true
+
+elif [ -n "$KSH_VERSION" ]
+then
+    [[ -n "$PS1" || -n "$__sh_interactive" ]] || return
+    shell=ksh
+    func=true
+
 else    # assume some Bourne variant
-    [ -n "$PS1" ] || return
+    [ -n "$PS1" -o -n "$__sh_interactive" ] || return
     shell=sh
     func=''
 fi

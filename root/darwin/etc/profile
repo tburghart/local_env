@@ -26,55 +26,120 @@ then
 	eval `/usr/libexec/path_helper -s`
 fi
 
+#
+# below here *should* be common accross platforms
+#
+
+# some platforms default to being lenient with non-system umasks, but I'm not
+umask 022
+
 # strictly for per-system global environment overrides
 if [ -r /usr/local/etc/env.local ]
 then
     . /usr/local/etc/env.local
 fi
 
-# see if we can assure that $SHELL is set to something sane
-if [ -n "$BASH_VERSION" ]
+# identify the shell and some features
+# - start with shells that may be emulating others
+# - $PS1 isn't always a reliable test for an interactive shell, so
+#   if the shell has a distinct test, use it
+# - theoretically, if this file is being sourced it's a login shell,
+#   but confirm if we can
+if [ -n "$ZSH_VERSION" ]
 then
-    __prf_sh=bash
+    __sh_sh=zsh
+    if [[ -o interactive ]]
+    then
+        __sh_interactive=true
+    else
+        unset __sh_interactive
+    fi
+    if [[ -o login ]]
+    then
+        __sh_login=true
+    else
+        unset __sh_login
+    fi
+elif [ -n "$BASH_VERSION" ]
+then
+    __sh_sh=bash
+    case "$-" in
+        *i*)  __sh_interactive=true   ;;
+        *)    unset __sh_interactive  ;;
+    esac
+    if shopt -q login_shell
+    then
+        __sh_login=true
+    else
+        unset __sh_login
+    fi
 elif [ -n "$KSH_VERSION" ]
 then
-    __prf_sh=ksh
-elif [ -n "$ZSH_VERSION" ]
-then
-    __prf_sh=zsh
+    __sh_sh=ksh
+    if [[ -n "$PS1" ]]
+    then
+        __sh_interactive=true
+    else
+        unset __sh_interactive
+    fi
+    case "$0" in
+        -*) __sh_login=true   ;;
+        *)  unset __sh_login  ;;
+    esac
 else
-    __prf_sh=sh
+    __sh_sh=sh
+    if [ -n "$PS1" ]
+    then
+        __sh_interactive=true
+    else
+        unset __sh_interactive
+    fi
+    case "$0" in
+        -*) __sh_login=true   ;;
+        *)  unset __sh_login  ;;
+    esac
 fi
+
+# see if we can assure that $SHELL is set to something sane
 if [ -z "$SHELL" -o ! -f "$SHELL" ]
 then
     __prf_fn=`basename "$SHELL"`
-    if [ "$__prf_fn" != "$__prf_sh" -a "$__prf_fn" != "r$__prf_sh" ]
+    if [ "$__prf_fn" != "$__sh_sh" -a "$__prf_fn" != "r$__sh_sh" ]
     then
-        for __prf in /bin/$__prf_sh /usr/bin/$__prf_sh `which $__prf_sh`
+        for __prf_sh in /bin/$__sh_sh /usr/bin/$__sh_sh `which $__sh_sh`
         do
-            if [ -f "$__prf" -a -x "$__prf" ]
+            if [ -f "$__prf_sh" -a -x "$__prf_sh" ]
             then
-                SHELL="$__prf"
+                SHELL="$__prf_sh"
                 export SHELL
                 break
             fi
         done
+        unset __prf_sh
     fi
     unset __prf_fn
 fi
 
-if [ -n "$PS1" ]
+# history management varies by shell, but the recognized variables' are 
+# consistent enough that we just set them regardless of the specific shell
+HISTCONTROL='erasedups'
+HISTFILE="$HOME/.sh_history"
+HISTFILESIZE=2048
+HISTSIZE=1024
+SAVEHIST="$HISTFILESIZE"
+export HISTCONTROL HISTFILE HISTFILESIZE HISTSIZE SAVEHIST
+
+if [ -n "$__sh_interactive" ]
 then
-    if [ $__prf_sh = zsh -a -r /etc/zshrc ]
+    if [ $__sh_sh = zsh -a -r /etc/zshrc ]
     then
+        # zsh will source the file itself
         true
-    elif [ -r /etc/${__prf_sh}rc ]
+    elif [ -r /etc/${__sh_sh}rc ]
     then
-        . /etc/${__prf_sh}rc
+        . /etc/${__sh_sh}rc
     elif [ -r /etc/shrc ]
     then
         . /etc/shrc
     fi
 fi
-
-unset __prf __prf_sh

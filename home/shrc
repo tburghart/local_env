@@ -32,15 +32,16 @@
 umask	022
 
 # what shell are we using?
-if [[ -n "$BASH_VERSION" ]]
+# start with shells that may be emulating others
+if [[ -n "$ZSH_VERSION" ]]
+then
+    __shrc_sh=zsh
+elif [[ -n "$BASH_VERSION" ]]
 then
     __shrc_sh=bash
 elif [[ -n "$KSH_VERSION" ]]
 then
     __shrc_sh=ksh
-elif [[ -n "$ZSH_VERSION" ]]
-then
-    __shrc_sh=zsh
 else
     __shrc_sh=sh
 fi
@@ -101,6 +102,8 @@ case "$__shrc_sh" in
     bash)
         # bash specific
         set -o vi
+        shopt -s histappend
+        
         alias whence='type -p'
         alias which='type -p'
         typeof()
@@ -122,6 +125,7 @@ case "$__shrc_sh" in
     ksh)
         # ksh specific
         set -o vi
+        set -o vi-tabcomplete
     	alias which='whence'
         typeof()
         {
@@ -322,7 +326,7 @@ copyright()
         elif [[ -n "$TRB_PRJ_BASE" \
         && "${__cpy_dir#${TRB_PRJ_BASE}}" != "$__cpy_dir" ]]
         then
-            __cpy_who='T. R. Burghart'
+            __cpy_who='T. R. Burghart.'
         fi
     fi
     case "$__cpy_sty" in

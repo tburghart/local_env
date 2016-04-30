@@ -26,11 +26,16 @@ shome="$HOME"
 stype="$(uname -s)"
 mtype="$(uname -m)"
 usern="${LOGNAME:-${USER:-$(id -un)}}"
-shell="${0#-}"
-shell="${shell##*/}"
-if [[ "$shell" != *sh && -n "$SHELL" ]]
+if [[ -n "$__sh_sh" ]]
 then
-    shell="${SHELL##*/}"
+    shell="$__sh_sh"
+else
+    shell="${0#-}"
+    shell="${shell##*/}"
+    if [[ "$shell" != *sh && -n "$SHELL" ]]
+    then
+        shell="${SHELL##*/}"
+    fi
 fi
 unset_vars='shell shome stype mtype usern'
 
@@ -203,7 +208,11 @@ then
     [[ -n "$VISUAL" ]] || VISUAL="$MATE --wait"
 else
     unset MATE
-    [[ -n "$VISUAL" ]] || VISUAL="$(which tedit || echo $EDITOR)"
+    if [[ -z "$VISUAL" ]]
+    then
+        VISUAL="$(which tedit)"
+        [[ -n "$VISUAL" ]] || VISUAL="$EDITOR"
+    fi
 fi
 P4EDITOR="$VISUAL"
 WINEDITOR="$VISUAL"
@@ -212,7 +221,7 @@ export VISUAL P4EDITOR WINEDITOR
 case "$shell" in
     bash)
         # bash stupidly doesn't source its rc files from an interactive login shell
-        if [[ -n "$PS1" ]]
+        if [[ "$-" = *i* || -n "$__sh_interactive" || -n "$PS1" ]]
         then
             for f in "$HOME/.bashrc" "$HOME/.shrc"
             do

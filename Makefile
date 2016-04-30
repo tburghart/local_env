@@ -21,6 +21,7 @@
 # Builds a proper profile/rc structure and removes leftover gunk.
 #
 # The result looks like:
+#   /etc/bashrc         -> /etc/shrc *
 #   /etc/profile
 #   /etc/shrc
 #   /etc/zprofile       -> /etc/profile
@@ -36,13 +37,17 @@
 #   ~/.zprofile         -> ~/.profile
 #   ~/.zshrc            -> ~/.shrc
 #
+# * /etc/bashrc gets special handling
+#   It's not a recognized startup file for bash, but its presence has been
+#   co-opted by enough default system configurations that I replace it so
+#   that if it does get sourced at least I'll control what it contains.
+#
 # Used if present:
 #   /etc/profile.d/*.sh
 #   /usr/local/etc/sh.*
 #
 # !!! Removed if present:
 #
-#   /etc/bashrc
 #   /etc/kshrc
 #   /etc/zshenv
 #   /etc/profile.d/zzz_local.sh
@@ -53,7 +58,6 @@
 #
 home_deprecated	:= $(wildcard $(HOME)/.zshenv)
 root_deprecated	:= $(wildcard \
-	/etc/bashrc \
 	/etc/kshrc \
 	/etc/zshenv \
 	/etc/profile.d/zzz_local.sh \
@@ -145,7 +149,7 @@ r_tgts	:= $(patsubst $(prjdir)/root/%, /%, \
 # the definitive list is in the Makefile header
 
 h_tgts	+= $(foreach fn, bash_profile zprofile bashrc kshrc zshrc, $(HOME)/.$(fn))
-r_tgts	+= $(foreach fn, zprofile zshrc, /etc/$(fn))
+r_tgts	+= $(foreach fn, zprofile bashrc zshrc, /etc/$(fn))
 
 # sort to remove duplicates
 h_tgts  := $(sort $(h_tgts))
@@ -222,6 +226,9 @@ $(HOME)/.% : $(prjdir)/home/%
 # create symlinks for files that don't have sources
 # NO wildcards - too much chance to screw up!
 # the definitive list is in the Makefile header
+
+/etc/bashrc : /etc/shrc
+	$(INSTSL) $(<F) $@
 
 /etc/zprofile : /etc/profile
 	$(INSTSL) $(<F) $@

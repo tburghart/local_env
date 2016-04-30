@@ -15,24 +15,30 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 # ========================================================================
 #
-# set some common interactive shell commands that are builtins in some
+# set up interactive shell behavior
+# alias some common commands that are builtins in some shells
 #
 
-if [ -n "$BASH_VERSION" ]
+# what shell are we using?
+# start with shells that may be emulating others
+if [ -n "$ZSH_VERSION" ]
 then
-    [[ -n "$PS1" ]] || return
+    [[ -o interactive ]] || return
+    alias whereis='whence -a'
+
+elif [ -n "$BASH_VERSION" ]
+then
+    [[ -n "$PS1" || -n "$__sh_interactive" || "$-" == *i* ]] || return
+    shopt -s checkwinsize
+    shopt -s cmdhist
     alias whence='type'
     alias whereis='type -a'
     alias which='type -p'
 
 elif [ -n "$KSH_VERSION" ]
 then
-    [[ -n "$PS1" ]] || return
+    [[ -n "$PS1" || -n "$__sh_interactive" ]] || return
     alias whereis='whence -a'
 	alias which='whence'
 
-elif [ -n "$ZSH_VERSION" ]
-then
-    [[ -o interactive ]] || return
-    alias whereis='whence -a'
 fi

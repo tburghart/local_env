@@ -143,7 +143,7 @@ then
         xc_toolchains='/Applications/Xcode.app/Contents/Developer/Toolchains'
         unset alt_sys_base
         for n in \
-            '/XcodeDefault.xctoolchain/usr/lib/swift-migrator/sdk/MacOSX.sdk'
+            'XcodeDefault.xctoolchain/usr/lib/swift-migrator/sdk/MacOSX.sdk'
         do
             if [[ -d "$xc_toolchains/$n/usr/include/openssl" ]]
             then
@@ -158,7 +158,7 @@ then
         fi
         if [[ $otp_vsn_major -ge 17 ]]
         then
-            config_opts+=" --with-ssl --with-ssl-incl=$alt_sys_base/usr"
+            config_opts+=" --with-ssl=/usr --with-ssl-incl=$alt_sys_base/usr"
         else
             config_opts+=" --with-ssl=$alt_sys_base/usr"
         fi

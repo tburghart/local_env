@@ -91,7 +91,8 @@ unset   EXCLUDE_OSX_RT_VERS_FLAG
 
 hipe_supported()
 {
-    if [[ $otp_vsn_major -gt 16 && "$os_type" != 'darwin' ]] \
+    if [[ $otp_vsn_major -ge 18 ]] \
+    || [[ $otp_vsn_major -gt 16 && "$os_type" != 'darwin' ]] \
     || [[ $otp_vsn_major -gt 15 && "$os_type" == 'linux' ]]
     then
         return 0
@@ -135,7 +136,12 @@ fi
 
 if [[ "$os_type" == 'darwin' ]]
 then
-    config_opts='--enable-darwin-64bit --with-cocoa'
+    if [[ $otp_vsn_major -ge 19 ]]
+    then
+        config_opts='--enable-64bit'
+    else
+        config_opts='--enable-darwin-64bit --with-cocoa'
+    fi
     if [[ -d '/usr/include/openssl' ]]
     then
         config_opts+=' --with-ssl'
@@ -169,9 +175,9 @@ else
 fi
 config_opts+=" --without-odbc"
 
-[[ $otp_vsn_major -ge 16 ]] || config_opts+=' --without-wx'
-[[ $otp_vsn_major -lt 17 ]] || config_opts+=' --without-gs'
 [[ $otp_vsn_major -lt 17 ]] || config_opts+=' --enable-dirty-schedulers'
+[[ $otp_vsn_major -ge 16 ]] || config_opts+=' --without-wx'
+[[ $otp_vsn_major -ne 17 ]] || config_opts+=' --without-gs'
 
 ERL_TOP="$(pwd)"
 PATH="$ERL_TOP/bin:$PATH"

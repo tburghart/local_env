@@ -1,1 +1,4 @@
+#!/usr/bin/false This file is meant to be sourced
+[[ -z "$otp_source_base" ]] || return 0
 otp_source_base="$BASHO_PRJ_BASE"
+[[ " $env_local_unset " == *\ otp_source_base\ * ]] || env_local_unset+=' otp_source_base'

@@ -848,6 +848,7 @@ alias r15=". $LOCAL_OTP_DIR/otp-15/activate"
 alias r16=". $LOCAL_OTP_DIR/otp-16/activate"
 alias r17=". $LOCAL_OTP_DIR/otp-17/activate"
 alias r18=". $LOCAL_OTP_DIR/otp-18/activate"
+alias r19=". $LOCAL_OTP_DIR/otp-19/activate"
 alias unkerl='kerl_deactivate'
 alias we='whence erl'
 

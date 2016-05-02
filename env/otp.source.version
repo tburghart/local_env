@@ -15,19 +15,19 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 # ========================================================================
 #
-# Obtain the OTP release from an OTP source tree
+# Obtain the OTP version from an OTP source tree
 #
 # Sets the following environment variables:
 #
-#   otp_release
+#   otp_src_release
 #       The full release string, which may be more verbose than what will
 #       be returned by erlang:system_info(otp_release).
 #
-#   otp_vsn_major
+#   otp_src_vsn_major
 #       The integer value of the release's major version. This value will
 #       always be an integer greater than zero.
 #
-#   otp_vsn_minor
+#   otp_src_vsn_minor
 #       The integer value of the release's minor version. This value will
 #       be zero if not explicitly included in the release information.
 #
@@ -35,61 +35,74 @@
 # variables are not set.
 #
 
-if [[ -n "$ERL_TOP" ]]
+[[ -z "$otp_source_version" ]] || return 0
+
+# variables that will be set here
+unset otp_src_release otp_src_vsn_major otp_src_vsn_minor
+for n in otp_src_dir otp_src_release otp_src_vsn_major otp_src_vsn_minor otp_source_version
+do
+    [[ " $env_local_unset " == *\ $n\ * ]] || env_local_unset+=" $n"
+done
+unset n
+
+if [[ -z "$otp_src_dir" ]]
 then
-    otp_src_dir="$ERL_TOP"
-else
-    otp_src_dir="$(pwd)"
+    if [[ -n "$ERL_TOP" ]]
+    then
+        otp_src_dir="$ERL_TOP"
+    else
+        otp_src_dir="$(pwd)"
+    fi
 fi
-unset   otp_release otp_vsn_major otp_vsn_minor
 
 for d in bin bootstrap erts lib system
 do
     if [[ ! -d "$otp_src_dir/$d" ]]
     then
-        echo    "${BASH_SOURCE[0]##*/} error:" \
+        echo    'error:' \
                 "'$otp_src_dir' doesn't look like an OTP build directory" >&2
         echo    "    * directory '$otp_src_dir/$d' is missing" >&2
-        unset   d otp_src_dir
+        unset   d
         return  2
     fi
 done
-unset   d
+unset d
 
 if [[ -f "$otp_src_dir/OTP_VERSION" ]]
 then
-    otp_release="$(<"$otp_src_dir/OTP_VERSION")"
-    otp_vsn_major="${otp_release%%[^[:digit:]]*}"
-    otp_vsn_minor="${otp_release#${otp_vsn_major}}"
-    if [[ "$otp_vsn_minor" == .[0-9]* ]]
+    otp_src_release="$(<"$otp_src_dir/OTP_VERSION")"
+    otp_src_vsn_major="${otp_src_release%%[^[:digit:]]*}"
+    otp_src_vsn_minor="${otp_src_release#${otp_src_vsn_major}}"
+    if [[ "$otp_src_vsn_minor" == .[0-9]* ]]
     then
-        otp_vsn_minor="${otp_vsn_minor:1}"
-        otp_vsn_minor="${otp_vsn_minor%%[^[:digit:]]*}"
+        otp_src_vsn_minor="${otp_src_vsn_minor:1}"
+        otp_src_vsn_minor="${otp_src_vsn_minor%%[^[:digit:]]*}"
     else
-        otp_vsn_minor='0'
+        otp_src_vsn_minor='0'
     fi
 elif [[ -f "$otp_src_dir/erts/vsn.mk" ]]
 then
-    otp_release="$($ESED -n \
+    otp_src_release="$($ESED -n \
         's/^[[:space:]]*SYSTEM_VSN[[:space:]]*=[[:space:]]*([^[:space:]]+)[[:space:]]*$/\1/p' \
         "$otp_src_dir/erts/vsn.mk" )"
-    otp_vsn_major="${otp_release:1:2}"
-    otp_vsn_minor="${otp_release:4}"
-    if [[ -z "$otp_vsn_minor" ]]
+    otp_src_vsn_major="${otp_src_release:1:2}"
+    otp_src_vsn_minor="${otp_src_release:4}"
+    if [[ -z "$otp_src_vsn_minor" ]]
     then
-        otp_vsn_minor='0'
+        otp_src_vsn_minor='0'
     else
-        while [[ "$otp_vsn_minor" == 0* ]]
+        while [[ "$otp_src_vsn_minor" == 0* ]]
         do
-            otp_vsn_minor="${otp_vsn_minor:1}"
+            otp_src_vsn_minor="${otp_src_vsn_minor:1}"
         done
-        otp_vsn_minor="${otp_vsn_minor%%[^[:digit:]]*}"
+        otp_src_vsn_minor="${otp_src_vsn_minor%%[^[:digit:]]*}"
     fi
 else
-    echo    "${BASH_SOURCE[0]##*/} error:" \
+    echo    'error:' \
             "'$otp_src_dir' doesn't look like an OTP build directory" >&2
     echo    '    * no version information was found' >&2
     unset   otp_src_dir
     return  2
 fi
-unset   otp_src_dir
+
+otp_source_version="$otp_src_vsn_major.$otp_src_vsn_minor"

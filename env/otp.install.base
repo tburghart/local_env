@@ -1,1 +1,4 @@
+#!/usr/bin/false This file is meant to be sourced
+[[ -z "$otp_install_base" ]] || return 0
 otp_install_base="$LOCAL_OTP_DIR"
+[[ " $env_local_unset " == *\ otp_install_base\ * ]] || env_local_unset+=' otp_install_base'

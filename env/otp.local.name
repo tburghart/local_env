@@ -19,7 +19,7 @@
 #
 # If $otp_name is not already set, then:
 #
-#   If ${ERL_TOP:-$(pwd)} is under $otp_source_base
+#   If ${otp_src_dir:-${ERL_TOP:-$(pwd)}} is under $otp_source_base
 #   Or $(pwd) is under $otp_install_base
 #   Then
 #       the result is the starting path with the base removed
@@ -29,34 +29,27 @@
 #   If the result contains directory separators, they are replaced with dashes
 #
 
-if [[ -z "$otp_name" ]]
+[[ -z "$otp_name" ]] || return 0
+[[ " $env_local_unset " == *\ otp_name\ * ]] || env_local_unset+=' otp_name'
+
+. "$LOCAL_ENV_DIR/otp.source.base"
+. "$LOCAL_ENV_DIR/otp.install.base"
+
+p="$(pwd)"
+s="${otp_src_dir:-${ERL_TOP:-${p}}}"
+t="${target_dir:-${p}}"
+
+if [[ "$s" == "$otp_source_base"/* ]]
 then
-    . "$LOCAL_ENV_DIR/otp.source.base"
+    otp_name="${s#${otp_source_base}/}"
 
-    if [[ -n "$ERL_TOP" && -d "$ERL_TOP" ]]
-    then
-        if [[ "$ERL_TOP" == "$otp_source_base"/* ]]
-        then
-            otp_name="${ERL_TOP#${otp_source_base}/}"
-        else
-            otp_name="$(basename "$(dirname "$ERL_TOP")")/${ERL_TOP##*/}"
-        fi
-    else
-        . "$LOCAL_ENV_DIR/otp.install.base"
+elif [[ "$t" == "$otp_install_base"/* ]]
+then
+    otp_name="${t#${otp_install_base}/}"
 
-        [[ -n "$cur_dir" && -d "$cur_dir" ]] || cur_dir="$(pwd)"
-
-        if [[ "$cur_dir" == "$otp_source_base"/* ]]
-        then
-            otp_name="${cur_dir#${otp_source_base}/}"
-
-        elif [[ "$cur_dir" == "$otp_install_base"/* ]]
-        then
-            otp_name="${cur_dir#${otp_install_base}/}"
-
-        else
-            otp_name="$(basename "$(dirname "$cur_dir")")/${cur_dir##*/}"
-        fi
-    fi
-    otp_name="${otp_name//\//-}"
+else
+    t="${p%/*}"
+    otp_name="${t##*/}/${p##*/}"
 fi
+unset p s t
+otp_name="${otp_name//\//-}"

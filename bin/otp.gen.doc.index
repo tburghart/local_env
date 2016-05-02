@@ -22,7 +22,7 @@ readonly  sdir="$(cd "$(dirname "$0")" && pwd)"
 readonly  sname="${0##*/}"
 readonly  spath="$sdir/$sname"
 
-. "$LOCAL_ENV_DIR/otp.install.base"
+. "$LOCAL_ENV_DIR/otp.install.base" || exit $?
 
 if [[ $# -ne 1 ]]
 then
@@ -31,30 +31,16 @@ then
     exit 1
 fi
 
-readonly  inst_path="$otp_install_base/$1" 
+readonly  otp_inst_dir="$otp_install_base/$1" 
 
-if [[ ! -d "$inst_path" ]]
+if [[ ! -d "$otp_inst_dir" ]]
 then
-    echo "$sname error: '$inst_path' is not a directory" >&2
+    echo "$sname error: '$otp_inst_dir' is not a directory" >&2
     exit 2
 fi
+. "$LOCAL_ENV_DIR/otp.install.version" || exit $?
 
-cd "$inst_path"
-
-if ls -1 lib/erlang/releases/*/OTP_VERSION 1>/dev/null 2>&1
-then
-    readonly  pre17='false'
-    readonly  release="$(<"$(ls -1 lib/erlang/releases/*/OTP_VERSION | tail -1)")"
-else
-    if [[ ! -f 'lib/erlang/releases/RELEASES' ]]
-    then
-        echo "$sname error: '$inst_path' doesn't appear to be a proper OTP installation" >&2
-        exit 3
-    fi
-    readonly  pre17='true'
-    readonly  release="$(egrep '^.*release,' 'lib/erlang/releases/RELEASES' \
-        | head -1 | cut -f3 -d, | cut -f2 '-d"')"
-fi
+cd "$otp_inst_dir"
 
 readonly  erts_path="$(ls -1d lib/erlang/erts-* 2>/dev/null | tail -1)"
 if [[ -z "$erts_path" || ! -d "$erts_path" ]]
@@ -76,7 +62,7 @@ app_path()
     echo "$_ap_path"
 }
 
-readonly  index_file="$inst_path/index.html"
+readonly  index_file="$otp_inst_dir/index.html"
 readonly  href_entry='<a href="%s">%s</a>'
 
 cat <<EOF >"$index_file"
@@ -84,7 +70,7 @@ cat <<EOF >"$index_file"
 <html>
   <head>
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-    <title>Erlang/OTP $release Documentation</title>
+    <title>Erlang/OTP $otp_inst_release Documentation</title>
     <style type="text/css">
       body      { margin-top: 0.6in; margin-bottom: 0.6in;
                   margin-left: 0.8in; margin-right: 0.8in; }
@@ -95,7 +81,7 @@ cat <<EOF >"$index_file"
     </style>
   </head>
   <body>
-    <h2>Erlang/OTP $release Documentation</h2>
+    <h2>Erlang/OTP $otp_inst_release Documentation</h2>
     <hr>
     <h3>General</h3>
     <p>
@@ -164,4 +150,3 @@ cat <<EOF >>"$index_file"
 EOF
 
 echo Wrote "'$index_file'"
-

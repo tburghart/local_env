@@ -34,7 +34,7 @@ alias lt='/bin/ls -lhtr'
 # locations of standard utilities between /bin and /usr/bin
 for DATE in /bin/date /usr/bin/date date
 do
-    if [ -f "$GREP" -a -x "$GREP" ]
+    if [ -f "$DATE" -a -x "$DATE" ]
     then
         break
     fi
@@ -62,7 +62,7 @@ do
 done
 for UNAME in /bin/uname /usr/bin/uname uname
 do
-    if [ -f "$GREP" -a -x "$GREP" ]
+    if [ -f "$UNAME" -a -x "$UNAME" ]
     then
         break
     fi

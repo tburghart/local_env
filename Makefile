@@ -66,10 +66,12 @@ root_deprecated	:= $(wildcard \
 	/usr/local/etc/zsh.term.prompt)
 
 prjdir	:= $(CURDIR)
-stype	:= $(or $(shell /usr/bin/uname -s 2>/dev/null \
+uname	:= $(or $(wildcard /bin/uname), \
+		$(wildcard /usr/bin/uname), \
+		$(error Can't find system uname program))
+stype	:= $(or $(shell $(uname) -s 2>/dev/null \
 		| /usr/bin/tr '[A-Z]' '[a-z]' 2>/dev/null), \
 		$(error Can't determine system type))
-
 uid	:= $(or $(shell /usr/bin/id -u 2>/dev/null), \
 		$(error Can't figure out your UID))
 gid	:= $(or $(shell /usr/bin/id -g 2>/dev/null), \

@@ -268,8 +268,10 @@ vers_suffix()
 {
     local ver="$(cut -d. -f1-$suffix_elems <<<"${1#*-}")"
     # if the last element doesn't start with a number, the result is going to
-    # be funky, but that would mean the version was pretty bogus to start with
-    echo "${ver%%[^0-9]*}"
+    # be truncated, but that would mean the version was bogus to start with
+    # still, accomodate the last character being '.' and strip it if it is
+    ver="${ver%%[^0-9.]*}"
+    echo "${ver%.}"
 }
 
 #
@@ -407,7 +409,7 @@ safe_repo_rm()
 }
 
 #
-# init_repo_version otp-activate repo vers-spec dest-dir
+# init_source_repo otp-activate repo vers-spec dest-dir
 #
 init_source_repo()
 {
@@ -504,19 +506,19 @@ init_repo_version()
 
     if [[ "$repo" = 'riak_cs' ]]
     then
-        init_source_repo "$repo" "$prev_spec" "$prev_src_dir"
-        init_source_repo "$repo" "$curr_spec" "$curr_src_dir"
+        init_source_repo "$prev_otp_activate" "$repo" "$prev_spec" "$prev_src_dir"
+        init_source_repo "$curr_otp_activate" "$repo" "$curr_spec" "$curr_src_dir"
         init_test_build "$prev_otp_activate" "$prev_src_dir" "$RT_TOP_DIR/${repo}_os/$prev_suff"
         init_test_build "$curr_otp_activate" "$curr_src_dir" "$RT_TOP_DIR/${repo}_os/$curr_suff"
         export  RIAK_CS_EE_DEPS='true'
-        init_source_repo "$repo" "$prev_spec" "$prev_src_dir"
-        init_source_repo "$repo" "$curr_spec" "$curr_src_dir"
+        init_source_repo "$prev_otp_activate" "$repo" "$prev_spec" "$prev_src_dir"
+        init_source_repo "$curr_otp_activate" "$repo" "$curr_spec" "$curr_src_dir"
         init_test_build "$prev_otp_activate" "$prev_src_dir" "$RT_TOP_DIR/${repo}_ee/$prev_suff"
         init_test_build "$curr_otp_activate" "$curr_src_dir" "$RT_TOP_DIR/${repo}_ee/$curr_suff"
         unset   RIAK_CS_EE_DEPS
     else
-        init_source_repo "$repo" "$prev_spec" "$prev_src_dir"
-        init_source_repo "$repo" "$curr_spec" "$curr_src_dir"
+        init_source_repo "$prev_otp_activate" "$repo" "$prev_spec" "$prev_src_dir"
+        init_source_repo "$curr_otp_activate" "$repo" "$curr_spec" "$curr_src_dir"
         init_test_build "$prev_otp_activate" "$prev_src_dir" "$RT_TOP_DIR/$repo/$prev_suff"
         init_test_build "$curr_otp_activate" "$curr_src_dir" "$RT_TOP_DIR/$repo/$curr_suff"
     fi

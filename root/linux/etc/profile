@@ -148,7 +148,7 @@ then
     __prf_fn=`basename "$SHELL"`
     if [ "$__prf_fn" != "$__sh_sh" -a "$__prf_fn" != "r$__sh_sh" ]
     then
-        for __prf_sh in /bin/$__sh_sh /usr/bin/$__sh_sh `which $__sh_sh`
+        for __prf_sh in /bin/$__sh_sh /usr/bin/$__sh_sh `which $__sh_sh 2>/dev/null`
         do
             if [ -f "$__prf_sh" -a -x "$__prf_sh" ]
             then

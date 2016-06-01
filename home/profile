@@ -166,7 +166,7 @@ then
         ECP='/bin/cp -p'
     fi
 fi
-[[ -n "$EGREP" ]] || EGREP="$(which egrep || echo egrep)"
+[[ -n "$EGREP" ]] || EGREP="$(which egrep 2>/dev/null || echo egrep)"
 if [[ -z "$ESED" ]]
 then
     if [[ "$stype" == 'Linux' ]]
@@ -176,31 +176,31 @@ then
         ESED='/usr/bin/sed -E'
     fi
 fi
-[[ -n "$GIT" ]] || GIT="$(which git || echo git)"
+[[ -n "$GIT" ]] || GIT="$(which git 2>/dev/null || echo git)"
 if [[ -z "$MAKE" ]]
 then
     case "$stype" in
         Darwin|Linux)
             MAKE="$(type -p /usr/bin/make \
-                || which make || which gmake || echo make)"
+                || which make 2>/dev/null || which gmake 2>/dev/null || echo make)"
             ;;
         *)
-            MAKE="$(which gmake || which make || echo gmake)"
+            MAKE="$(which gmake 2>/dev/null || which make 2>/dev/null || echo gmake)"
             ;;
     esac
 fi
 export ECP EGREP ESED GIT LANG MAKE
 
 BLOCKSIZE=1024
-for EDITOR in $(which vi) $(which vim) $(which nano) vi ; do break ; done
-for PAGER in $(which less) $(which more) more ; do break ; done
+for EDITOR in $(which vi 2>/dev/null) $(which vim 2>/dev/null) $(which nano 2>/dev/null) vi ; do break ; done
+for PAGER in $(which less 2>/dev/null) $(which more 2>/dev/null) more ; do break ; done
 export BLOCKSIZE EDITOR PAGER
 
 if [[ -n "$SSH_TTY" ]]
 then
-    MATE="$(which rmate)"
+    MATE="$(which rmate 2>/dev/null)"
 else
-    MATE="$(which mate)"
+    MATE="$(which mate 2>/dev/null)"
 fi
 if [[ -n "$MATE" ]]
 then
@@ -210,7 +210,7 @@ else
     unset MATE
     if [[ -z "$VISUAL" ]]
     then
-        VISUAL="$(which tedit)"
+        VISUAL="$(which tedit 2>/dev/null)"
         [[ -n "$VISUAL" ]] || VISUAL="$EDITOR"
     fi
 fi

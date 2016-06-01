@@ -3,9 +3,9 @@
 #
 
 # basics
-if [ -z "$(which wget)" ]
+if [ -z "$(which wget 2>/dev/null)" ]
 then
-    x="$(which curl)"
+    x="$(which curl 2>/dev/null)"
     if [ -n "$x" ]
     then
         alias wget="$x --remote-name-all"

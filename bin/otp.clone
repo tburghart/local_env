@@ -61,6 +61,8 @@ readonly  envdir
 
 ln -s "$envdir/env.otp.shared" env
 
+# old versions of git will blow up here, and that's ok - I don't do repo
+# maintenance on out-of-date platforms
 $GIT remote add --tags erlang git@github.com:erlang/otp.git
 $GIT remote add --no-tags tedb git@github.com:tburghart/otp.git
 $GIT remote add --no-tags vinoski git@github.com:vinoski/otp.git

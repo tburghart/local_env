@@ -1,0 +1,154 @@
+#!/usr/bin/false This file is meant to be sourced
+# ========================================================================
+# Copyright (c) 2014-2016 T. R. Burghart.
+# 
+# Permission to use, copy, modify, and/or distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+# 
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+# ========================================================================
+#
+# Set up appropriate configure options for building OTP
+#
+# Sets the following environment variables:
+#
+#   otp_config_opts
+#       The core configure options for the platform and version.
+#
+#   otp_hipe_supported
+#       'true' or 'false' as appropriate for the platform and version.
+#
+#   otp_hipe_default
+#       'true' or 'false' indicating whether unspecified builds should
+#       enable or disable HiPE.
+#
+
+[[ -z "$otp_config_opts" ]] || return 0
+
+# variables that will be set here
+unset otp_hipe_default otp_hipe_supported
+for n in otp_config_opts otp_hipe_default otp_hipe_supported
+do
+    [[ " $env_local_unset " == *\ $n\ * ]] || env_local_unset+=" $n"
+done
+unset n
+
+. "$LOCAL_ENV_DIR/os.type"
+. "$LOCAL_ENV_DIR/otp.source.version"
+. "$LOCAL_ENV_DIR/env.tool.defaults"
+
+if [[ "$os_type" == 'darwin' ]]
+then
+    if [[ $otp_src_vsn_major -ge 19 ]]
+    then
+        otp_config_opts='--enable-64bit'
+    else
+        otp_config_opts='--enable-darwin-64bit --with-cocoa'
+    fi
+    if [[ -d '/usr/include/openssl' ]]
+    then
+        otp_config_opts+=' --with-ssl'
+    else
+        xc_toolchains='/Applications/Xcode.app/Contents/Developer/Toolchains'
+        unset alt_sys_base
+        for n in \
+            'XcodeDefault.xctoolchain/usr/lib/swift-migrator/sdk/MacOSX.sdk'
+        do
+            if [[ -d "$xc_toolchains/$n/usr/include/openssl" ]]
+            then
+                alt_sys_base="$xc_toolchains/$n"
+                break
+            fi
+        done
+        unset n
+        if [[ -z "$alt_sys_base" ]]
+        then
+            echo    'error: no OpenSSL headers found!' >&2
+            unset   xc_toolchains
+            return  2
+        fi
+        if [[ $otp_src_vsn_major -ge 17 ]]
+        then
+            otp_config_opts+=" --with-ssl=/usr --with-ssl-incl=$alt_sys_base/usr"
+        else
+            otp_config_opts+=" --with-ssl=$alt_sys_base/usr"
+        fi
+        unset alt_sys_base xc_toolchains
+    fi
+else
+    otp_config_opts='--enable-64bit --with-ssl'
+fi
+
+if [[ $otp_src_vsn_major -ge 18 ]]
+then
+    otp_hipe_supported='true'
+    otp_hipe_default='true'
+
+elif [[ $otp_src_vsn_major -ge 17 ]]
+then
+    otp_hipe_supported='true'
+    case "$os_type" in
+        'linux'|'freebsd')
+            otp_hipe_default='true'
+            ;;
+        *)
+            otp_hipe_default='false'
+            ;;
+    esac
+
+elif [[ $otp_src_vsn_major -ge 16 ]]
+then
+    case "$os_type" in
+        'linux')
+            otp_hipe_supported='true'
+            otp_hipe_default='true'
+            ;;
+        *)
+            otp_hipe_supported='false'
+            otp_hipe_default='false'
+            ;;
+    esac
+
+else
+    otp_hipe_supported='false'
+    otp_hipe_default='false'
+fi
+
+if [[ $otp_src_vsn_major -ge 17 ]]
+then
+    otp_config_opts+=' --enable-dirty-schedulers'
+fi
+if [[ $otp_src_vsn_major -le 15 ]]
+then
+    otp_config_opts+=' --without-wx'
+fi
+if [[ $otp_src_vsn_major -ge 17 ]]
+then
+    otp_config_opts+=' --with-wx --without-gs'
+fi
+
+if [[ $otp_src_vsn_major -lt 17 ]]
+then
+    add_flags=''
+    add_flags+=' -Wno-deprecated-declarations'
+    add_flags+=' -Wno-empty-body'
+    add_flags+=' -Wno-implicit-function-declaration'
+    add_flags+=' -Wno-parentheses-equality'
+    add_flags+=' -Wno-pointer-sign'
+    add_flags+=' -Wno-tentative-definition-incomplete-type'
+    add_flags+=' -Wno-unused-function'
+    add_flags+=' -Wno-unused-value'
+    add_flags+=' -Wno-unused-variable'
+
+    CFLAGS+="$add_flags"
+    CXXFLAGS+="$add_flags"
+    export  CFLAGS CXXFLAGS
+    unset   add_flags
+fi

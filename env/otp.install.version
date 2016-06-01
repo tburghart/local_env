@@ -1,0 +1,118 @@
+#!/usr/bin/false This file is meant to be sourced
+# ========================================================================
+# Copyright (c) 2014-2016 T. R. Burghart.
+# 
+# Permission to use, copy, modify, and/or distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+# 
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+# ========================================================================
+#
+# Obtain the OTP version from an OTP installation
+#
+# Sets the following environment variables:
+#
+#   otp_inst_release
+#       The full release string, which may be more verbose than what will
+#       be returned by erlang:system_info(otp_release).
+#
+#   otp_inst_vsn_major
+#       The integer value of the release's major version. This value will
+#       always be an integer greater than zero.
+#
+#   otp_inst_vsn_minor
+#       The integer value of the release's minor version. This value will
+#       be zero if not explicitly included in the release information.
+#
+# On error, an error is printed, a non-zero result is returned, and the
+# variables are not set.
+#
+
+[[ -z "$otp_install_version" ]] || return 0
+
+# variables that will be set here
+unset otp_inst_release otp_inst_vsn_major otp_inst_vsn_minor
+for n in otp_inst_dir otp_inst_release otp_inst_vsn_major otp_inst_vsn_minor otp_install_version
+do
+    [[ " $env_local_unset " == *\ $n\ * ]] || env_local_unset+=" $n"
+done
+unset n
+
+if [[ -z "$otp_inst_dir" ]]
+then
+    if [[ -n "$target_dir" ]]
+    then
+        otp_inst_dir="$target_dir"
+    else
+        otp_inst_dir="$(pwd)"
+    fi
+fi
+
+for d in bin lib lib/erlang lib/erlang/releases
+do
+    if [[ ! -d "$otp_inst_dir/$d" ]]
+    then
+        echo    'error:' \
+                "'$otp_inst_dir' doesn't look like an OTP installation directory" >&2
+        echo    "    * directory '$otp_inst_dir/$d' is missing" >&2
+        unset   d
+        return  2
+    fi
+done
+unset d
+
+if /bin/ls "$otp_inst_dir/lib/erlang/releases"/*/OTP_VERSION 1>/dev/null 2>&1
+then
+    otp_inst_release="$(< \
+        "$(/bin/ls -1 "$otp_inst_dir/lib/erlang/releases"/*/OTP_VERSION \
+        | tail -1)" )"
+    otp_inst_vsn_major="${otp_inst_release%%[^[:digit:]]*}"
+    otp_inst_vsn_minor="${otp_inst_release#${otp_inst_vsn_major}}"
+    if [[ "$otp_inst_vsn_minor" == .[0-9]* ]]
+    then
+        otp_inst_vsn_minor="${otp_inst_vsn_minor:1}"
+        otp_inst_vsn_minor="${otp_inst_vsn_minor%%[^[:digit:]]*}"
+    else
+        otp_inst_vsn_minor='0'
+    fi
+else
+    if /bin/ls -d "$otp_inst_dir/lib/erlang/releases"/R[01][0-9][AB]* 1>/dev/null 2>&1
+    then
+        otp_inst_release="$(basename \
+            "$(/bin/ls -1d "$otp_inst_dir/lib/erlang/releases"/R[01][0-9][AB]* \
+            | tail -1)" )"
+    elif [[ -f "$otp_inst_dir/lib/erlang/releases/RELEASES" ]]
+    then
+        otp_inst_release="$($EGREP \
+            '^[[:space:]]*(\[[[:space:]]*)?\{[[:space:]]*release[[:space:]]*,' \
+            "$otp_inst_dir/lib/erlang/releases/RELEASES" \
+            | cut -f3 -d, | cut -f2 '-d"' | sort | tail -1)"
+    else
+        echo    'error:' \
+                "'$otp_inst_dir' doesn't look like an OTP installation directory" >&2
+        echo    '    * no release version information was found' >&2
+        unset   otp_inst_dir
+        return  2
+    fi
+    otp_inst_vsn_major="${otp_inst_release:1:2}"
+    otp_inst_vsn_minor="${otp_inst_release:4}"
+    if [[ -z "$otp_inst_vsn_minor" ]]
+    then
+        otp_inst_vsn_minor='0'
+    else
+        while [[ "$otp_inst_vsn_minor" == 0* ]]
+        do
+            otp_inst_vsn_minor="${otp_inst_vsn_minor:1}"
+        done
+        otp_inst_vsn_minor="${otp_inst_vsn_minor%%[^[:digit:]]*}"
+    fi
+fi
+
+otp_install_version="$otp_inst_vsn_major.$otp_inst_vsn_minor"

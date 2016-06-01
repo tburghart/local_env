@@ -90,12 +90,12 @@ readonly  rt_spec='master'
 
 #
 # Which OTP builds to use.
-# Note that webmachine breaks if you build the 'previous' OTP from either
-# the OTP_R15B01_basho1 tag or the head of the basho-otp-15 branch, use tag
-# basho_OTP_R15B01p instead.
+# Note that webmachine breaks if you build the 'previous' OTP from the
+# OTP_R15B01_basho1 tag, use tag basho_OTP_R15B01p or the head of the
+# basho-otp-15 branch instead.
 #
-readonly  curr_otp_activate='/opt/basho/otp-16-b10/activate'
-readonly  prev_otp_activate='/opt/basho/otp-15-p1/activate'
+readonly  curr_otp_activate='/opt/basho/otp-16-bc/activate'
+readonly  prev_otp_activate='/opt/basho/otp-15-bc/activate'
 
 #
 # Old source directories that will be DELETED ENTIRELY if found.

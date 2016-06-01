@@ -43,12 +43,12 @@ egrep "^#{${mindepth},${maxdepth}}[^#]" "$1" | while read header
 do
     token="${header%%[^#]*}"
     depth="${#token}"
-    label="${header:${depth}}"
-    space="${label%%[^ ]*}"
-    label="${label:${#space}}"
     width="$(((($depth - $mindepth) * 2) + 1))"
-
-    typeset -l  href="${label// /-}"
+    label="${header:${depth}}"
+    while [[ "$label" == \ * ]] ; do label="${label:1}" ; done
+    while [[ "$label" == *\  ]] ; do label="${label/% }" ; done
+    strip="${label//[^[:alnum:] _-]}"
+    typeset -l  href="${strip// /-}"
     if $first
     then
         first='false'

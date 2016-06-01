@@ -138,7 +138,9 @@ do
     docs_log="docs.$os_type.$otp_label.txt"
     install_log="install.$os_type.$otp_label.txt"
 
-    $GIT clean -fdqx -e /env -e /.idea/ -e '*.iml' -e '/*.txt'
+    $GIT clean -fdqx -e /env -e /.idea/ -e '*.iml' -e '/*.txt' \
+    || $GIT clean -f -f -dqx -e /env -e /.idea/ -e '*.iml' -e '/*.txt' \
+    || true
 
     [[ $makejobs -lt 2 ]] || export MAKEFLAGS="-j$makejobs"
     [[ $verbosity -lt 1 ]] || export V="$verbosity"
@@ -153,9 +155,9 @@ do
 
     if [[ -d "$otp_dest" ]]
     then
-        rm -rf "$otp_dest/bin" "$otp_dest/lib"
+        /bin/rm -rf "$otp_dest/bin" "$otp_dest/lib" "$otp_dest/index.html"
     else
-        mkdir -m 2775 "$otp_dest"
+        /bin/mkdir -m 2775 "$otp_dest"
     fi
 
     /bin/date >"$install_log"

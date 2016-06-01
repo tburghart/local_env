@@ -192,7 +192,7 @@ fi
 export ECP EGREP ESED GIT LANG MAKE
 
 BLOCKSIZE=1024
-for EDITOR in $(which vi) $(which nano) vi ; do break ; done
+for EDITOR in $(which vi) $(which vim) $(which nano) vi ; do break ; done
 for PAGER in $(which less) $(which more) more ; do break ; done
 export BLOCKSIZE EDITOR PAGER
 

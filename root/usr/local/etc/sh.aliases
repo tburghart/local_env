@@ -30,11 +30,50 @@ alias lll='/bin/ls -lh'
 alias lr='/bin/ls -lhR'
 alias lt='/bin/ls -lhtr'
 
-# platform specific
+# some systems (mainly Linux distros, because of course they do) juggle the
+# locations of standard utilities between /bin and /usr/bin
+for DATE in /bin/date /usr/bin/date date
+do
+    if [ -f "$GREP" -a -x "$GREP" ]
+    then
+        break
+    fi
+done
+for GREP in /usr/bin/grep /bin/grep grep
+do
+    if [ -f "$GREP" -a -x "$GREP" ]
+    then
+        break
+    fi
+done
+for EGREP in /usr/bin/egrep /bin/egrep "$GREP -E"
+do
+    if [ -f "$EGREP" -a -x "$EGREP" ]
+    then
+        break
+    fi
+done
+for SED in /usr/bin/sed /bin/sed sed
+do
+    if [ -f "$SED" -a -x "$SED" ]
+    then
+        break
+    fi
+done
+for UNAME in /bin/uname /usr/bin/uname uname
+do
+    if [ -f "$GREP" -a -x "$GREP" ]
+    then
+        break
+    fi
+done
+alias   egrep="$EGREP"
+export  DATE EGREP GREP SED UNAME
+
+# platform specific switches and aliases
 ECP='/bin/cp -p'
-EGREP='/usr/bin/egrep'
-ESED='/usr/bin/sed -E'
-case "$(/usr/bin/uname -s)" in
+ESED="$SED -E"
+case "$($UNAME -s)" in
     Darwin)
         alias dscl='/usr/bin/dscl -raw .'
         alias lchflags='/usr/bin/chflags -h'
@@ -55,10 +94,9 @@ case "$(/usr/bin/uname -s)" in
     Linux)
         alias llf='/bin/ls -lhZ'
         alias lll='/bin/ls -lh --lcontext'
-        ESED='/usr/bin/sed -r'
+        ESED="$SED -r"
         ;;
 esac
-alias ecp="$ECP"
-alias egrep="$EGREP"
-alias esed="$ESED"
-export  ECP EGREP ESED
+alias   ecp="$ECP"
+alias   esed="$ESED"
+export  ECP ESED

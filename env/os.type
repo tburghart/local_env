@@ -1,4 +1,4 @@
 #!/usr/bin/false This file is meant to be sourced
 [[ -z "$os_type" ]] || return 0
-os_type="$(/usr/bin/uname -s | /usr/bin/tr '[A-Z]' '[a-z]')"
+os_type="$(uname -s | tr '[A-Z]' '[a-z]')"
 [[ " $env_local_unset " == *\ os_type\ * ]] || env_local_unset+=' os_type'

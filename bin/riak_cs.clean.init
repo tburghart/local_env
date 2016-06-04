@@ -34,8 +34,8 @@
 #   deleted mercilessly!
 # - You'll almost certainly have to change the 'curr_otp_activate' and
 #   'prev_otp_activate' paths.
-# - Unless you're planning to go overboard on testing, you'll probably
-#   want to unset 'db_alt'.
+# - If you want to go overboard on testing, un-comment 'db_alt' and set it
+#   to an alternate riak version.
 #
 # Programming:
 # - The script relies heavily on the '-e' option in the interpreter directive
@@ -71,7 +71,8 @@ readonly  st_prev='1.5.0'
 # If "$db_alt" is set, it should refer to another version of Riak [EE] that's
 # [mostly] compatible with CS version $cs_vers, to be used for testing.
 #
-readonly  db_alt='2.0'
+unset db_alt
+# readonly  db_alt='2.0'
 
 #
 # How many elements of a repo's version to use as a directory name suffix.
@@ -122,7 +123,7 @@ readonly  rt_roots='riak riak_ee riak_cs_os riak_cs_ee stanchion'
 # Keep track of what we want to export/display before the user confirms.
 # 'display_vars' are whitespace-separated EREs and should contain at least
 # everything unset below.
-# 'export_vars' can only be whitespace-separeated whole variable names.
+# 'export_vars' can only be whitespace-separated whole variable names.
 #
 unset CPPFLAGS DEVNODES ERL_LIBS MAKEFLAGS RIAK_CS_EE_DEPS
 display_vars='CPPFLAGS DEVNODES ERL_LIBS MAKEFLAGS RIAK_CS_EE_DEPS'
@@ -157,9 +158,9 @@ if [[ -z "$ESED" ]]
 then
     if [[ "$os_type" == 'Linux' ]]
     then
-        ESED='/usr/bin/sed -r'
+        ESED="$(type -p sed) -r"
     else
-        ESED='/usr/bin/sed -E'
+        ESED="$(type -p sed) -E"
     fi
 fi
 export_vars+=' ESED'
@@ -226,7 +227,7 @@ else
         [[ -z "$CXX" ]] || break
     done
 fi
-unset c ccand cccand
+unset c ccands cccands
 
 CCC="$CXX"
 CCFLAGS="$CXXFLAGS"
@@ -323,8 +324,8 @@ do
                 echo \* Releases of R15B01 with a suffix cause the version \
                     of webmachine used by $csn to build incorrectly. >&2
                 echo \* To use a Basho version of R15, use \
-                    basho_OTP_R15B01p, NOT the head of the basho-otp-15 \
-                    branch or OTP_R15B01_basho1. >&2
+                    basho_OTP_R15B01p or the head of the basho-otp-15 \
+                    branch, NOT OTP_R15B01_basho1. >&2
                 err=2
                 ;;
             16/*)
@@ -587,11 +588,19 @@ cat >"$RT_CONFIG" <<EOF
 %%
 
 {default, [
-    {rt_max_wait_time,  60000},
-    {rt_retry_delay,    500},
+    % riak_test common
+    {rt_max_wait_time,  75000},
+    {rt_retry_delay,    750},
+    {conn_fail_time,    35000},
+    {lager_level,       debug},
 
+    {rt_scratch_dir,    "/tmp/riak_test_scratch"},
+    {spam_dir,          "$CS_TOP_DIR/riak_test-cs/search-corpus/spam.0"},
+
+    % CS setup
     {rt_project,        "riak_cs"},
-    {rt_harness,        rtcs_dev},
+    {rt_harness,        rt_cs_dev},
+    {backend,           {multi_backend, bitcask}},
     {rt_deps,           ["$CS_SRC_ROOT/deps"]},
     {test_paths,        ["$CS_SRC_ROOT/riak_test/ebin"]},
     {src_paths,         [
@@ -611,8 +620,6 @@ cat >"$RT_CONFIG" <<EOF
         {stanchion_current, "$RT_TOP_DIR/stanchion/$(vers_suffix "$st_vers")"},
         {stanchion_previous,"$RT_TOP_DIR/stanchion/$(vers_suffix "$st_prev")"}
     ]},
-    {lager_level,       debug},
-    {backend,           {multi_backend, bitcask}},
     %
     % just so it's fully-formed for when I forget to point at an explicit config
     % this is effectively the 'cs_ee' configuration

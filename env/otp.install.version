@@ -31,6 +31,9 @@
 #       The integer value of the release's minor version. This value will
 #       be zero if not explicitly included in the release information.
 #
+#   otp_install_version
+#       $otp_inst_vsn_major.$otp_inst_vsn_minor
+#
 # On error, an error is printed, a non-zero result is returned, and the
 # variables are not set.
 #

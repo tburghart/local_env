@@ -1,7 +1,26 @@
+#!/usr/bin/false This file is meant to be sourced
+# ========================================================================
+# Copyright (c) 2014-2016 T. R. Burghart.
+# 
+# Permission to use, copy, modify, and/or distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+# 
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+# ========================================================================
 #
-# lightweight mock kerl activate
+# Lightweight OTP activate script that's somewhat compatible with kerl.
 #
-# this assumes bash, other shells may vary
+# I was still using kerl in places when this started, so I've stuck with
+# their naming, but stuff like the PLTs won't get set or cleaned up by kerl.
+#
+# This assumes bash, other shells will vary.
 #
 env_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -16,6 +35,24 @@ kerl_deactivate 2>/dev/null || true
 _KERL_PATH_REMOVABLE="$env_dir/bin"
 PATH="$_KERL_PATH_REMOVABLE:${PATH//${_KERL_PATH_REMOVABLE}:/}"
 
+PLT=$(ls -1d $env_dir/otp.*.plt 2>/dev/null | tail -1)
+if [[ -n "$PLT" && -f "$PLT" ]]
+then
+    _ACTIVATE_UNSET+=' PLT'
+    if [[ -n "$LOCAL_PLT_DIR" && -d "$LOCAL_PLT_DIR" ]]
+    then
+        LOCAL_PLT="$LOCAL_PLT_DIR/local.${PLT##*/}"
+        _ACTIVATE_UNSET+=' LOCAL_PLT'
+    elif [[ -z "$LOCAL_PLT" ]]
+    then
+        LOCAL_PLT="local.${PLT##*/}"
+        _ACTIVATE_UNSET+=' LOCAL_PLT'
+    fi
+    export  $_ACTIVATE_UNSET _ACTIVATE_UNSET
+else
+    unset   PLT
+fi
+
 unset   env_dir
 export  PATH _KERL_PATH_REMOVABLE
 
@@ -26,6 +63,10 @@ kerl_deactivate()
         export  PATH="${PATH//${_KERL_PATH_REMOVABLE}:/}"
         unset   _KERL_PATH_REMOVABLE
         hash    -r 2>/dev/null || true
+    fi
+    if [[ -n "$_ACTIVATE_UNSET" ]]
+    then
+        unset   $_ACTIVATE_UNSET _ACTIVATE_UNSET
     fi
     unset   -f kerl_deactivate
 }

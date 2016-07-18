@@ -177,5 +177,6 @@ do
         otp.gen.doc.index "$otp_label" >>"$docs_log"
         /bin/date >>"$docs_log"
         $ECP $docs_log "$otp_dest"
+        otp.gen.plt "$otp_label"
     fi
 done

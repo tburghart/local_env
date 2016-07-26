@@ -134,10 +134,12 @@ then
     otp_config_opts+=' --with-wx --without-gs'
 fi
 
+otp_config_opts+=' OMIT_OMIT_FP=yes'
+CFLAGS+=' -DERTS_FRMPTR'
+
 if [[ -f /etc/redhat-release && ! -f /etc/fedora-release ]]
 then
     CFLAGS+=' -DOPENSSL_NO_EC=1'
-    export  CFLAGS
 fi
 
 if [[ $otp_src_vsn_major -lt 17 ]]
@@ -155,6 +157,7 @@ then
 
     CFLAGS+="$add_flags"
     CXXFLAGS+="$add_flags"
-    export  CFLAGS CXXFLAGS
     unset   add_flags
 fi
+
+export  CFLAGS CXXFLAGS

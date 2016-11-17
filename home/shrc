@@ -247,87 +247,189 @@ then
     }
 fi
 
+_copyright_style()
+{
+    case "$1" in
+        [cC]|*.c|*.h)
+            echo c      ;;
+        [cC][cC]|[cC][pP][pP]|*.cc|*.C|*.cpp|*.hh|*.H|*.hpp)
+            echo cc     ;;
+        erl|*.erl|*.hrl)
+            echo erl    ;;
+        sh|*.mk|*.*sh|Makefile)
+            echo sh     ;;
+        [sS][qQ][lL]|[dD][dD][lL]|*.[sS][qQ][lL]|*.[dD][dD][lL])
+            echo sql    ;;
+    esac
+}
+_copyright_prefix()
+{
+    case "$1" in
+        c)
+            echo ' *'   ;;
+        cc)
+            echo '//'   ;;
+        erl)
+            echo '%%'   ;;
+        sh)
+            echo '#'    ;;
+        sql)
+            echo '--'   ;;
+    esac
+}
+_copyright_owner()
+{
+    __cpy_own_dir=''
+    __cpy_own_val=''
+    case "$1" in
+        [bB]asho*)
+            __cpy_own_val='basho'
+            ;;
+        T*Burghart)
+            __cpy_own_val='trb'
+            ;;
+        ''|-|.)
+            __cpy_own_dir="$(pwd)"
+            ;;
+        ..)
+            __cpy_own_dir="$(cd .. && pwd)"
+            ;;
+        *)
+            if [[ -d "$1" ]]
+            then
+                __cpy_own_dir="$(cd "$1" && pwd)"
+            elif [[ "$1" == */* && -d "$(dirname "$1")" ]]
+            then
+                __cpy_own_dir="$(cd "$(dirname "$1")" && pwd)"
+            else
+                __cpy_own_dir="$(pwd)"
+            fi
+    esac
+    if [[ -z "$__cpy_own_val" ]]
+    then
+        if [[ -n "$BASHO_PRJ_BASE" \
+            && "$__cpy_own_dir/" == "$BASHO_PRJ_BASE/"* ]]
+        then
+            __cpy_own_val='basho'
+        elif [[ -n "$TRB_PRJ_BASE" \
+            && "$__cpy_own_dir/" == "$TRB_PRJ_BASE/"* ]]
+        then
+            __cpy_own_val='trb'
+        else
+            __cpy_own_val="${LOGNAME:-${USER:-$(id -un)}}"
+        fi
+    fi
+    case "$__cpy_own_val" in
+        ted|trb)
+            echo 'T. R. Burghart'
+            ;;
+        *)
+            echo "$__cpy_own_val"
+            ;;
+    esac
+    unset   __cpy_own_dir __cpy_own_val
+}
+
 # copyright [path] [prefix]
 copyright()
 {
-    if [[ "$1" == '-h' || "$1" == '--help' || $# -gt 2 ]]
-    then
-        echo    'usage: copyright [path] [prefix|style]' >&2
-        echo    'note: if only one parameter is provided it will be treated as a prefix' >&2
-        echo    '      unless it contains a slash (/) preceeded by at least one non-slash' >&2
-        return  1
-    fi
-    __cpy_dir=''
-    __cpy_pre="$2"
+    __cpy_bad=''
+    __cpy_cnt='0'
+    __cpy_pre=''
+    __cpy_ret='0'
     __cpy_sty=''
+    __cpy_tgt=''
     __cpy_who=''
-    if [[ -n "$1" ]]
-    then
-        if [[ -d "$1" ]]
-        then
-            __cpy_dir="(cd "$1" && pwd)"
-        elif [[ "$1" == ?*/* && -d "${1%/*}" ]]
-        then
-            __cpy_dir="(cd "${1%/*}" && pwd)"
-        elif [[ $# -lt 2 ]]
-        then
-            __cpy_pre="$1"
-        fi
-    fi
-    [[ -n "$__cpy_dir" ]] || __cpy_dir="$(pwd)"
-    if [[ $# -eq 1 && -z "$__cpy_pre" ]]
-    then
-        case "${1##*/}" in
-            [cC]|*.c|*.h)
-                __cpy_sty=c
-                __cpy_pre=' *'
+    __cpy_unset='__cpy_bad __cpy_cnt __cpy_pre __cpy_ret __cpy_sty __cpy_tgt __cpy_who'
+
+    while [[ $# -gt 0 ]]
+    do
+        case "$1" in
+            -h|--help)
+                __cpy_ret='1'
                 ;;
-            [cC][cC]|[cC][pP][pP]|*.cc|*.C|*.cpp|*.hh|*.H|*.hpp)
-                __cpy_sty=cc
-                __cpy_pre='//'
+            -o|--owner)
+                if [[ $# -gt 1 ]]
+                then
+                    shift
+                    __cpy_who="$1"
+                else
+                    __cpy_bad+=' owner'
+                fi
                 ;;
-            erl|*.erl|*.hrl)
-                __cpy_sty=erl
-                __cpy_pre='%%'
+            -p|--pre|--prefix)
+                if [[ $# -gt 1 ]]
+                then
+                    shift
+                    __cpy_pre="$1"
+                else
+                    __cpy_bad+=' prefix'
+                fi
                 ;;
-            sh|*.mk|*.sh|Makefile)
-                __cpy_sty=sh
-                __cpy_pre='#'
+            -s|--sty|--style)
+                if [[ $# -gt 1 ]]
+                then
+                    shift
+                    __cpy_sty="$(_copyright_style "$1")"
+                    if [[ -z "$__cpy_sty" ]]
+                    then
+                        __cpy_bad+=" style='$1'"
+                    fi
+                else
+                    __cpy_bad+=' style'
+                fi
+                ;;
+            -*)
+                __cpy_bad+=" $1"
+                ;;
+            *)
+                if [[ -n "$__cpy_tgt" ]]
+                then
+                    __cpy_bad+=" $1"
+                elif [[ -z "$__cpy_pre" && -z "$__cpy_sty" \
+                    && -z "$__cpy_tgt" && "$1" != *[./]* ]]
+                then
+                    __cpy_sty="$(_copyright_style "$1")"
+                    if [[ -z "$__cpy_sty" ]]
+                    then
+                        __cpy_tgt="$1"
+                    fi
+                else
+                    __cpy_tgt="$1"
+                fi
                 ;;
         esac
+        shift
+    done
+    if [[ $__cpy_cnt -eq 0 ]]
+    then
+        __cpy_out[0]='-'
+    fi
+    if [[ -n "$__cpy_bad" ]]
+    then
+        echo    "error: bad argument(s):$__cpy_bad" >&2
+        __cpy_ret='2'
+    fi
+    if [[ $__cpy_ret -ne 0 ]]
+    then
+        echo    'usage: copyright [-h] [-o owner] [-p prefix] [-s style] [style] [path]' >&2
+        echo    'note: if neither of style or prefix is explicitly set AND the first non-switch'
+        echo    '      parameter contains neither of [./] AND it matches a known style it will' >&2
+        echo    '      be treated as such' >&2
+        unset   $__cpy_unset __cpy_unset
+        return  $__cpy_ret
+    fi
+    if [[ -z "$__cpy_who" ]]
+    then
+        __cpy_who="$(_copyright_owner "$__cpy_tgt")"
     fi
     if [[ -z "$__cpy_sty" ]]
     then
-        case "$__cpy_pre" in
-            [cC])
-                __cpy_sty=c
-                __cpy_pre=' *'
-                ;;
-            [cC][cC]|[cC][pP][pP])
-                __cpy_sty=cc
-                __cpy_pre='//'
-                ;;
-            erl)
-                __cpy_sty=erl
-                __cpy_pre='%%'
-                ;;
-            sh)
-                __cpy_sty=sh
-                __cpy_pre='#'
-                ;;
-        esac
+        __cpy_sty="$(_copyright_style "${__cpy_tgt##*/}")"
     fi
-    if [[ -n "$__cpy_dir" ]]
+    if [[ -z "$__cpy_pre" ]]
     then
-        if [[ -n "$BASHO_PRJ_BASE" \
-        && "${__cpy_dir#${BASHO_PRJ_BASE}}" != "$__cpy_dir" ]]
-        then
-            __cpy_who='basho'
-        elif [[ -n "$TRB_PRJ_BASE" \
-        && "${__cpy_dir#${TRB_PRJ_BASE}}" != "$__cpy_dir" ]]
-        then
-            __cpy_who='T. R. Burghart.'
-        fi
+        __cpy_pre="$(_copyright_prefix "$__cpy_sty")"
     fi
     case "$__cpy_sty" in
         c)
@@ -358,7 +460,6 @@ copyright()
             printf '%s %s\n' "$__cpy_pre" "$__cpy_ln"
             ;;
         *)
-            [[ -n "$__cpy_who" ]] || __cpy_who="${LOGNAME:-${USER:-$(id -un)}}"
             __cpy_ln='========================================================================'
             printf '%s %s\n' "$__cpy_pre" "$__cpy_ln"
             printf '%s Copyright (c) %u %s\n' "$__cpy_pre" "$(date '+%Y')" "$__cpy_who"
@@ -376,16 +477,13 @@ copyright()
             printf '%s OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.\n' "$__cpy_pre"
             printf '%s %s\n' "$__cpy_pre" "$__cpy_ln"
             ;;
-        *)
-            printf '%s\n' "$__cpy_pre"
-            ;;
     esac
     case "$__cpy_sty" in
         c)
             printf '%s\n' ' */'
             ;;
     esac
-    unset   __cpy_dir __cpy_ln __cpy_pre __cpy_sty __cpy_who
+    unset   $__cpy_unset __cpy_unset
 }
 
 # Find Here Or Above
@@ -471,9 +569,8 @@ lenm()
     fi
 }
 
-lenv()
+_reset_lenv()
 {
-    lenv_target="$(fhoa $lenv_file 2>/dev/null || true)"
     case "$(typeof reset_lenv)" in
         undefined )
             if [[ -n "$reset_lenv" ]]
@@ -497,6 +594,13 @@ lenv()
             reset_lenv
             ;;
     esac
+    unset lenv_current 2>/dev/null || true
+}
+
+lenv()
+{
+    lenv_target="$(fhoa $lenv_file 2>/dev/null || true)"
+    _reset_lenv
     if [[ -n "$lenv_aliases" ]]
     then
         unalias $lenv_aliases 2>/dev/null
@@ -507,16 +611,16 @@ lenv()
 
     if [[ -f "$lenv_target" ]]
     then
+        lenv_current="${lenv_target%/*}"
         . "$lenv_target"
         lenv_result=$?
         unset $env_local_unset env_local_unset \
             $(set | $ESED -n 's/^(local_[[:alnum:]_]+)=.*$/\1/p' | tr '\n' ' ') \
             2>/dev/null
-        if [[ $lenv_result -ne 0 && "$(typeof reset_lenv)" != undefined ]]
-        then
-            reset_lenv
-        fi
-        lenv_current="${lenv_target%/*}"
+        [[ $lenv_result -eq 0 ]] || _reset_lenv
+        # If the script set a reset function be sure to invoke it on failure.
+        # We'll still follow up with a default version just to be sure
+        # everything's cleaned up.
         if [[ "$(typeof reset_lenv)" == undefined && -z "$reset_lenv" ]]
         then
             reset_lenv()
@@ -548,8 +652,7 @@ lenv()
         fi
         if [[ $lenv_result -ne 0 ]]
         then
-            reset_lenv
-            unset lenv_current
+            _reset_lenv
         else
             echo loaded environment from "'$lenv_current'"
         fi
@@ -600,12 +703,12 @@ newscr()
             printf '#!/usr/bin/env escript\n' > "$2"
             printf '%%%% -*- mode: erlang; erlang-indent-level: 4; indent-tabs-mode: nil -*-\n' >> "$2"
             printf '%%%%! -smp enable +K true -sname %s\n' "${2##*/}" >> "$2"
-            copyright "$2" erl >> "$2"
+            copyright erl "$2" >> "$2"
             printf '\nmain(Args) ->\n    ok.\n' >> "$2"
             ;;
         bash | ksh | sh | zsh )
             printf '#!%s -e\n' "$s" > "$2"
-            copyright "$2" sh >> "$2"
+            copyright sh "$2" >> "$2"
             printf '\n' >> "$2"
             printf 'readonly  rdir="$(pwd)"\n' >> "$2"
             printf 'readonly  sdir="$(cd "$(dirname "$0")" && pwd)"\n' >> "$2"
@@ -750,7 +853,6 @@ alias ga="$GIT add"
 alias gaa="$GIT add -A"
 alias gb="$GIT branch"
 alias gci="$GIT commit"
-alias gcl="$GIT clone"
 alias gco="$GIT checkout"
 alias gd="$GIT diff"
 alias gds="$GIT describe"
@@ -762,6 +864,34 @@ alias gpush="$GIT push"
 alias gr="$GIT remote"
 alias gs="$GIT status"
 alias gt="$GIT tag"
+
+gcl()
+{
+    if [[ $# -eq 0 ]]
+    then
+        echo 'Usage: gcl [git clone args] {basho-repo-name|github-org/repo|git-url}' >&2
+        return 1
+    fi
+    local -a args=("$@")
+    local -i urlx=$((${#args[@]} - 1))
+    local url="${args[$urlx]}"
+    case "$url" in
+        https:*|ssh:*|git:*|git@*)
+            if [[ "$1" != *.git ]]
+            then
+                url="$url.git"
+            fi
+            ;;
+        */*)
+            url="https://github.com/$url.git"
+            ;;
+        *)
+            url="https://github.com/basho/$url.git"
+            ;;
+    esac
+    args[$urlx]="$url"
+    $GIT clone "${args[@]}"
+}
 
 gscrub()
 {
@@ -835,11 +965,11 @@ gy()
         echo 'Usage: gy <exactly-one-file-path>' >&2
         return 1
     fi
-    __gy_cwd="$(pwd)"
-    cd "$(dirname "$1")" && $GIT log --no-decorate -- "$(basename "$1")" \
-    | $ESED -n 's/^Date:.* ([12][9012][0-9][0-9]) .*$/\1/p' | sort -u
-    cd "$__gy_cwd"
-    unset __gy_cwd
+    local cwd="$(pwd)"
+    cd "$(dirname "$1")" && \
+    $GIT log '--date=format:%Y' '--format=%ad' '--' "$(basename "$1")" \
+    | sort -u
+    cd "$cwd"
 }
 
 # Erlang

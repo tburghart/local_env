@@ -52,16 +52,20 @@ then
     else
         otp_config_opts='--enable-darwin-64bit --with-cocoa'
     fi
-    if [[ -d '/usr/include/openssl' ]]
+    if [[ -f '/usr/include/openssl/crypto.h' ]]
     then
         otp_config_opts+=' --with-ssl'
+    elif [[ -f '/usr/local/include/openssl/crypto.h' ]]
+    then
+        otp_config_opts+=' --with-ssl=/usr/local'
+        otp_config_opts+=' --disable-dynamic-ssl-lib'
     else
         xc_toolchains='/Applications/Xcode.app/Contents/Developer/Toolchains'
         unset alt_sys_base
         for n in \
             'XcodeDefault.xctoolchain/usr/lib/swift-migrator/sdk/MacOSX.sdk'
         do
-            if [[ -d "$xc_toolchains/$n/usr/include/openssl" ]]
+            if [[ -f "$xc_toolchains/$n/usr/include/openssl/crypto.h" ]]
             then
                 alt_sys_base="$xc_toolchains/$n"
                 break
@@ -134,17 +138,23 @@ then
     otp_config_opts+=' --with-wx --without-gs'
 fi
 
+[[ " $CFLAGS " == ' -g ' ]] || CFLAGS+=' -g'
+[[ " $LDFLAGS " == ' -g ' ]] || LDFLAGS+=' -g'
+[[ " $CXXFLAGS " == ' -g ' ]] || CXXFLAGS+=' -g'
+
+add_flags=''
+
 otp_config_opts+=' OMIT_OMIT_FP=yes'
-CFLAGS+=' -DERTS_FRMPTR'
+add_flags+=' -DERTS_FRMPTR'
+# add_flags+=' -D_DARWIN_FEATURE_CLOCK_GETTIME=0'
 
 if [[ -f /etc/redhat-release && ! -f /etc/fedora-release ]]
 then
-    CFLAGS+=' -DOPENSSL_NO_EC=1'
+    add_flags+=' -DOPENSSL_NO_EC=1'
 fi
 
 if [[ $otp_src_vsn_major -lt 17 ]]
 then
-    add_flags=''
     add_flags+=' -Wno-deprecated-declarations'
     add_flags+=' -Wno-empty-body'
     add_flags+=' -Wno-implicit-function-declaration'
@@ -154,10 +164,9 @@ then
     add_flags+=' -Wno-unused-function'
     add_flags+=' -Wno-unused-value'
     add_flags+=' -Wno-unused-variable'
-
-    CFLAGS+="$add_flags"
-    CXXFLAGS+="$add_flags"
-    unset   add_flags
 fi
 
+CFLAGS+="$add_flags"
+CXXFLAGS+="$add_flags"
+unset   add_flags
 export  CFLAGS CXXFLAGS

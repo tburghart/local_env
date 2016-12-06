@@ -52,9 +52,9 @@ user="${LOGNAME:-${USER:-$(/usr/bin/id -un)}}"
 
 if [ $(/usr/bin/id -u) -eq 0 ]
 then
-    suff='$'
-else
     suff='#'
+else
+    suff='$'
 fi
 # don't assume shells handle C-style escapes in double-quoted strings!
 suff="

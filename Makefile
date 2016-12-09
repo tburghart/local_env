@@ -76,6 +76,11 @@ uid	:= $(or $(shell /usr/bin/id -u 2>/dev/null), \
 		$(error Can't figure out your UID))
 gid	:= $(or $(shell /usr/bin/id -g 2>/dev/null), \
 		$(error Can't figure out your GID))
+ifeq	($(stype),darwin)
+adm_gid	:= admin
+else
+adm_gid	:= 0
+endif
 
 # try to get the actual login name, for the test below
 usrname	:= $(or $(LOGNAME),$(USER),$(shell /usr/bin/id -un 2>/dev/null), \
@@ -96,17 +101,42 @@ else
 prof_d	:= false
 endif
 
+dl_cmd	:= $(shell which wget 2>/dev/null || true)
+ifneq ($(wildcard $(dl_cmd)),)
+dl_cmd	+= -O
+else
+dl_cmd	:= $(shell which curl 2>/dev/null || true)
+ifneq ($(wildcard $(dl_cmd)),)
+dl_cmd	+= -LRo
+else
+undefine dl_cmd
+$(warning Need curl or wget to download files)
+endif
+endif
+
 # counting on this unlinking the destination file before copying
 INSTALL	:= /usr/bin/install
 
+INSTADM	:= $(INSTALL) -o $(uid) -g $(adm_gid)
 INSTSYS	:= $(INSTALL) -o 0 -g 0
 INSTUSR	:= $(INSTALL) -o $(uid) -g $(gid)
+LNADM	:= /bin/ln -fs
 LNSYS	:= /bin/ln -fs
 LNUSR	:= /bin/ln -fs
 
 ifneq	($(uid),0)
 INSTSYS	:= @echo $(INSTSYS)
 LNSYS	:= @echo $(LNSYS)
+endif
+
+ifneq	($(adm_gid),0)
+INSTAF	:= $(INSTADM) -m 0664
+INSTAL	:= $(LNADM)
+INSTAX	:= $(INSTADM) -m 0775
+else
+INSTAF	:= $(INSTADM) -m 0644
+INSTAL	:= $(LNADM)
+INSTAX	:= $(INSTADM) -m 0755
 endif
 
 INSTSF	:= $(INSTSYS) -m 0644
@@ -116,6 +146,9 @@ INSTSX	:= $(INSTSYS) -m 0755
 INSTUF	:= $(INSTUSR) -m 0644
 INSTUL	:= $(LNUSR)
 INSTUX	:= $(INSTUSR) -m 0755
+
+# files to be installed from downloads defined elsewhere
+dl_tgts	:= /usr/local/bin/rmate /usr/local/bin/rebar3
 
 # these will be wildcard patterns, sort to remove duplicates
 sh_etc	:= $(sort profile ksh.kshrc bashrc kshrc shrc zshenv zprofile zshrc)
@@ -190,6 +223,10 @@ home :: $(h_tgts)
 		$(h_tgts) $(home_deprecated) ))
 
 ifneq	($(uid),0)
+home :: $(dl_tgts)
+endif
+
+ifneq	($(uid),0)
 root ::
 	@echo '***' Root commands must be executed manually.
 endif
@@ -252,4 +289,29 @@ $(HOME)/.kshrc : $(HOME)/.shrc
 
 $(HOME)/.zshrc : $(HOME)/.shrc
 	$(INSTUL) $(<F) $@
+
+# downloaded files are always installed from a temporary copy
+# so their timestamps can be checked
+
+ifeq	($(dl_cmd),)
+$(warning Skipping download/check of $(dl_tgts))
+else
+
+/usr/local/bin/rmate : /tmp/ledl/rmate
+	$(INSTAX) -p $< $@
+
+/usr/local/bin/rebar3 : /tmp/ledl/rebar3
+	$(INSTAX) -p $< $@
+
+/tmp/ledl/rmate :
+	@test -d $(@D) || /bin/mkdir -p $(@D)
+	@echo Downloading $@ ...
+	@$(prjdir)/bin/github.download textmate rmate bin/rmate $@
+
+/tmp/ledl/rebar3 :
+	@test -d $(@D) || /bin/mkdir -p $(@D)
+	@echo Downloading $@ ...
+	@$(dl_cmd) $@ https://s3.amazonaws.com/rebar3/rebar3
+
+endif
 

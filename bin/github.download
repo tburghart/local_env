@@ -1,0 +1,150 @@
+#!/bin/bash -e
+# ========================================================================
+# Copyright (c) 2016 T. R. Burghart
+#
+# Permission to use, copy, modify, and/or distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+# ========================================================================
+#
+# Download a versioned file from GitHub and set its modification time to
+# its last commit.
+#
+
+readonly  rdir="$(pwd)"
+readonly  sdir="$(cd "$(dirname "$0")" && pwd)"
+readonly  sname="${0##*/}"
+readonly  spath="$sdir/$sname"
+
+if [[ $# -ne 4 ]]
+then
+    echo "Usage: $sname <owner> <repo> <path> <destination>" >&2
+    exit 1
+fi
+
+info_url="https://api.github.com/repos/$1/$2/contents/$3"
+meta_url="https://api.github.com/repos/$1/$2/commits?path=$3"
+out_file="$4"
+
+if [[ -f "$out_file" ]]
+then
+    if [[ ! -w "$out_file" ]]
+    then
+        echo "$sname: $out_file: not writable" >&2
+        exit 1
+    fi
+else
+    out_dir="$(dirname "$out_file")"
+    if [[ ! -d "$out_dir" ]]
+    then
+        echo "$sname: $out_dir: not a directory" >&2
+        exit 1
+    elif [[ ! -w "$out_dir" ]]
+    then
+        echo "$sname: $out_dir: not writable" >&2
+        exit 1
+    fi
+fi
+
+# download from-url to-file
+if type -P wget 1>/dev/null 2>&1
+then
+    download()
+    {
+        local url="$1"
+        local tgt="$2"
+        local ret
+        set +e
+        wget -qS -o "$io_dir/dl.head" -O "$tgt" "$url" \
+            1>"$io_dir/dl.out" 2>"$io_dir/dl.err"
+        ret=$?
+        set -e
+        if [[ $ret -eq 8 ]]
+        then
+            echo "$sname: error downloading $url" >&2
+            head -1 "$io_dir/dl.head" >&2
+        elif [[ $ret -ne 0 ]]
+        then
+            echo "$sname: error retrieving $tgt" >&2
+            cat "$io_dir/dl.err" >&2
+        fi
+        return $ret
+    }
+elif type -P curl 1>/dev/null 2>&1
+then
+    download()
+    {
+        local url="$1"
+        local tgt="$2"
+        local ret
+        set +e
+        curl -sS -w '%{http_code}' -D "$io_dir/dl.head" -o "$tgt" "$url" \
+            1>"$io_dir/dl.out" 2>"$io_dir/dl.err"
+        ret=$?
+        set -e
+        if [[ $ret -ne 0 ]]
+        then
+            echo "$sname: error retrieving $tgt" >&2
+            cat "$io_dir/dl.err" >&2
+        elif [[ "$(< "$io_dir/dl.out")" != '200' ]]
+        then
+            echo "$sname: error downloading $url" >&2
+            head -1 "$io_dir/dl.head" >&2
+            ret=22
+        fi
+        return $ret
+    }
+else
+    echo "$sname: error: neither wget nor curl found" >&2
+    exit 2
+fi
+
+systype="$(uname -s)"
+if [[ -z "$ESED" ]]
+then
+    if [[ "$systype" == *[Ll]inux* ]]
+    then
+        ESED='sed -r'
+    else
+        ESED='sed -E'
+    fi
+fi
+if [[ -z "$ECP" ]]
+then
+    if [[ "$systype" == *[Dd]arwin* ]]
+    then
+        ECP='cp -pX'
+    else
+        ECP='cp -p'
+    fi
+fi
+
+io_dir="$(mktemp -d /tmp/$$.XXXXXXX)"
+trap "rm -rf $io_dir" EXIT
+
+download "$info_url" "$io_dir/gh.meta"
+filter='s/[[:space:]]*"download_url":[[:space:]]*"(.+)".*$/\1/p'
+file_url="$($ESED -n "$filter" "$io_dir/gh.meta")"
+
+download "$meta_url" "$io_dir/gh.meta"
+filter='/^[[:space:]]*"committer":[[:space:]]*\{/,/^[[:space:]]*"date":/'
+filter+=' s/^[[:space:]]*"date":[[:space:]]*"([0-9-]+)T([0-9:]+)Z".*$/\1 \2 GMT/p'
+gh_ts="$($ESED -n "$filter" "$io_dir/gh.meta" | head -1)"
+
+# BSD and GNU versions of 'date' use different options, try both
+utc_ts="$(date -jf '%Y-%m-%d %H:%M:%S %Z' "$gh_ts" '+%s' 2>/dev/null \
+        || date "--date=$gh_ts" '+%s')"
+touch_ts="$(date -jf '%s' "$utc_ts" '+%Y%m%d%H%M.%S' 2>/dev/null \
+        || date "--date=@$utc_ts" '+%Y%m%d%H%M.%S')"
+
+download "$file_url" "$io_dir/gh.file"
+touch -t "$touch_ts" "$io_dir/gh.file"
+$ECP "$io_dir/gh.file" "$out_file"

@@ -189,7 +189,11 @@ then
             ;;
     esac
 fi
-export ECP EGREP ESED GIT LANG MAKE
+[[ -n "$REBAR" ]] || \
+    REBAR="$(which /usr/local/bin/rebar 2>/dev/null || which rebar 2>/dev/null || echo rebar)"
+[[ -n "$REBAR3" ]] || \
+    REBAR3="$(which /usr/local/bin/rebar3 2>/dev/null || which rebar3 2>/dev/null || echo rebar3)"
+export ECP EGREP ESED GIT LANG MAKE REBAR REBAR3
 
 BLOCKSIZE=1024
 for EDITOR in $(which vi 2>/dev/null) $(which vim 2>/dev/null) $(which nano 2>/dev/null) vi ; do break ; done

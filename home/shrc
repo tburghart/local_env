@@ -1,6 +1,6 @@
 #!/usr/bin/false This file is meant to be sourced
 # ========================================================================
-# Copyright (c) 1994-2016 T. R. Burghart.
+# Copyright (c) 1994-2017 T. R. Burghart.
 # 
 # Permission to use, copy, modify, and/or distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -1005,6 +1005,7 @@ alias r16=". $LOCAL_OTP_DIR/otp-16/activate"
 alias r17=". $LOCAL_OTP_DIR/otp-17/activate"
 alias r18=". $LOCAL_OTP_DIR/otp-18/activate"
 alias r19=". $LOCAL_OTP_DIR/otp-19/activate"
+alias r20=". $LOCAL_OTP_DIR/otp-20/activate"
 alias unkerl='kerl_deactivate'
 alias we='whence erl'
 
@@ -1012,6 +1013,34 @@ if [[ -f "$TRB_PRJ_BASE/basho/erl_stuff/src/rebar_deps.erl" ]]
 then
     alias rdeps="escript $TRB_PRJ_BASE/basho/erl_stuff/src/rebar_deps.erl"
 fi
+
+rth()
+{
+    local file='.thumbs.yml'
+    if [[ ! -f "$file" ]]
+    then
+        echo No Thumbs file >&2
+        return 2
+    fi
+    local -a cmds
+    local temp="$(mktemp /tmp/tt.XXXXXXX)"
+    $ESED -n \
+        "s/^[[:space:]]+-[[:space:]]+(.+)[[:space:]]*\$/cmds[\${#cmds[@]}]='\\1'/p" \
+        "$file" > "$temp"
+    . "$temp"
+    /bin/rm "$temp"
+    local cmd
+    for cmd in "${cmds[@]}"
+    do
+        printf '>> %s\n' "$cmd"
+        $cmd
+        local ret=$?
+        [[ $ret -eq 0 ]] || return $ret
+    done
+}
+alias rclean='/bin/rm -rf ebin _build .rebar .rebar3 .eunit rebar.lock'
+alias rtha='for n in 16 17 18 19 ; do . $LOCAL_OTP_DIR/otp-$n/activate ; rclean ; rth || break ; done'
+alias rthax='for n in 16 17 18 19 20 ; do . $LOCAL_OTP_DIR/otp-$n/activate ; rclean ; rth || break ; done'
 
 lel()
 {
@@ -1152,8 +1181,14 @@ ss()
     printf "$env_ss_format" 'r16' 'activate erlang R16..basho-current'
     printf "$env_ss_format" 'r17' 'activate erlang OTP-17..basho-current'
     printf "$env_ss_format" 'r18' 'activate erlang OTP-18..basho-current'
+    printf "$env_ss_format" 'r19' 'activate erlang OTP-19..basho-current'
+    printf "$env_ss_format" 'r20' 'activate erlang OTP-20..basho-current'
     printf "$env_ss_format" 'we' 'whence erl'
     printf "$env_ss_format" 'unkerl' 'kerl_deactivate'
+    printf "$env_ss_format" 'rclean' 'delete rebar2/3 artifacts in the current directory'
+    printf "$env_ss_format" 'rth' 'run all steps in the .thumbs.yml file in the current directory with the current OTP'
+    printf "$env_ss_format" 'rtha' 'run all steps in the .thumbs.yml file in the current directory with OTP 16-GA'
+    printf "$env_ss_format" 'rthax' 'run all steps in the .thumbs.yml file in the current directory with OTP 16-RC'
     echo ''
     printf "$env_ss_format" 'chdir' 'same as cd'
     printf "$env_ss_format" 'copyright' '[path] [prefix|style]  write a copyright header to stdout'

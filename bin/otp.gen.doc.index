@@ -1,6 +1,6 @@
 #!/bin/bash -e
 # ========================================================================
-# Copyright (c) 2015-2016 T. R. Burghart.
+# Copyright (c) 2015-2017 T. R. Burghart.
 # 
 # Permission to use, copy, modify, and/or distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -116,16 +116,23 @@ EOF
 
 for p in lib/erlang/lib/*-*
 do
+    # allow for packages that don't create an 'html' subdirectory
     [[ -d "$p" ]] || continue
     if [[ -f "$p/doc/html/index.html" ]]
     then
         ix_ent="<a href=\"$p/doc/html/index.html\">API</a>"
+    elif [[ -f "$p/doc/index.html" ]]
+        then
+            ix_ent="<a href=\"$p/doc/index.html\">API</a>"
     else
         unset ix_ent
     fi
     if [[ -f "$p/doc/html/release_notes.html" ]]
     then
         rn_ent="<a href=\"$p/doc/html/release_notes.html\">Release Notes</a>"
+    elif [[ -f "$p/doc/release_notes.html" ]]
+    then
+        rn_ent="<a href=\"$p/doc/release_notes.html\">Release Notes</a>"
     else
         unset rn_ent
     fi

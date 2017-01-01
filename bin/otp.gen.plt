@@ -1,6 +1,6 @@
 #!/bin/bash -e
 # ========================================================================
-# Copyright (c) 2015-2016 T. R. Burghart.
+# Copyright (c) 2015-2017 T. R. Burghart.
 #
 # Permission to use, copy, modify, and/or distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -47,15 +47,33 @@ readonly  otp_plt_file="$otp_inst_dir/otp.$otp_install_version.plt"
 
 otp_plt_apps='erts'
 
+# apps in this list won't be added to otp_plt_apps
+plt_skip_apps="$otp_plt_apps"
+
 for dir in lib/erlang/lib/*-*
 do
-    [[ -d "$dir" && ! -L "$dir" && -d "$dir/ebin" \
-    && $(ls -1d $dir/ebin/*.beam 2>/dev/null | wc -l) -gt 0 ]] || continue
-
     app="${dir##*/}"
     app="${app%%-*}"
+
+    [[ " $plt_skip_apps " != *\ $app\ * && \
+        -d "$dir" && ! -L "$dir" && -d "$dir/ebin" ]] \
+    && ls -1 "$dir/ebin" 2>/dev/null | grep -q '\.beam$' || continue
+
     otp_plt_apps+=" $app"
 done
 
+/bin/rm -f "$otp_plt_file"
+
 echo Creating PLT "$otp_plt_file" ...
-"$otp_inst_dir/bin/dialyzer" --quiet --build_plt --output_plt "$otp_plt_file" --apps $otp_plt_apps
+set +e
+"$otp_inst_dir/bin/dialyzer" --quiet \
+    --build_plt --output_plt "$otp_plt_file" --apps $otp_plt_apps
+plt_ret=$?
+set -e
+
+# work around a call to a nonexistant function in eunit_test
+if [[ $plt_ret -eq 2 ]]
+then
+    plt_ret=0
+fi
+exit $plt_ret

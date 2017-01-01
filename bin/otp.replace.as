@@ -1,6 +1,6 @@
 #!/bin/bash -e
 # ========================================================================
-# Copyright (c) 2015-2016 T. R. Burghart.
+# Copyright (c) 2015-2017 T. R. Burghart.
 # 
 # Permission to use, copy, modify, and/or distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -145,7 +145,9 @@ do
     [[ $makejobs -lt 2 ]] || export MAKEFLAGS="-j$makejobs"
     [[ $verbosity -lt 1 ]] || export V="$verbosity"
 
-    /bin/date >"$build_log"
+    printf 'commit:\t' >"$build_log"
+    $GIT show-ref --heads --head --hash | head -1 >>"$build_log"
+    /bin/date >>"$build_log"
     env | sort >>"$build_log"
     echo "./otp_build setup -a $build_cfg" | tee -a "$build_log"
     ./otp_build setup -a $build_cfg 1>>"$build_log" 2>&1
@@ -171,12 +173,24 @@ do
 
     if [[ "$otp_install_base/otp-$otp_src_vsn_major" -ef "$otp_dest" ]]
     then
+        # run this before installing QuickCheck - no debug info in EQC beams
+        echo "otp.gen.plt $otp_label" | tee -a "$install_log"
+        otp.gen.plt "$otp_label" 1>>"$install_log" 2>&1
+
+        echo "/opt/QuickCheck/install_qc $otp_dest" | tee -a "$install_log"
+        if ! /opt/QuickCheck/install_qc "$otp_dest" 1>>"$install_log" 2>&1
+        then
+            echo 'Failed to install QuickCheck into' "$otp_dest" >&2
+        fi
+        /bin/date >>"$install_log"
+        $ECP "$install_log" "$otp_dest"
+
         /bin/date >"$docs_log"
         echo "$MAKE docs install-docs" | tee -a "$docs_log"
         $MAKE docs install-docs 1>>"$docs_log" 2>&1
+        echo "otp.gen.doc.index $otp_label" | tee -a "$docs_log"
         otp.gen.doc.index "$otp_label" >>"$docs_log"
         /bin/date >>"$docs_log"
         $ECP $docs_log "$otp_dest"
-        otp.gen.plt "$otp_label"
     fi
 done

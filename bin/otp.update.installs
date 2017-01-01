@@ -1,0 +1,97 @@
+#!/bin/ksh -e
+# ========================================================================
+# Copyright (c) 2015-2017 T. R. Burghart
+#
+# Permission to use, copy, modify, and/or distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+# ========================================================================
+
+readonly  rdir="$(pwd)"
+readonly  sdir="$(cd "$(dirname "$0")" && pwd)"
+readonly  sname="${0##*/}"
+readonly  spath="$sdir/$sname"
+
+[[ -n "$GIT" && -f "$GIT" && -x "$GIT" ]] || GIT="$(whence -p git)"
+if [[ -z "$GIT" ]]
+then
+    echo "$sname: error: git not found." >&2
+    exit 1
+fi
+export GIT
+
+. "$LOCAL_ENV_DIR/os.type" || exit $?
+. "$LOCAL_ENV_DIR/otp.install.base" || exit $?
+
+readonly  source='https://github.com/erlang/otp.git'
+set -A  dests \
+    'https://github.com/basho/otp.git' \
+    'https://github.com/tburghart/otp.git'
+
+readonly  work="$(mktemp -d /tmp/otp.XXXXXXX)"
+trap "/bin/rm -rf $work" EXIT
+
+typeset -ir vsn_min=17
+typeset -i  vsn
+typeset     otp ref rel tmp
+typeset     branch='master'
+
+$GIT clone --quiet "$source" "$work"
+cd "$work"
+
+ref="$($GIT branch --list | sed -En \
+    's/^[[:space:]]*\*[[:space:]]+([^[:space:]]+)[[:space:]]*$/\1/p')"
+if [[ "$ref" != "$branch" ]]
+then
+    for tmp in "${dests[@]}"
+    do
+        $GIT push --quiet "$tmp" "$ref"
+    done
+fi
+
+# work down from the version in $branch to $vsn_min
+
+while true
+do
+    $GIT checkout --quiet "$branch"
+    tmp="$(<OTP_VERSION)"
+    vsn="${tmp%%.*}"
+    rel="${tmp##*-}"
+    case "$rel" in
+        "$tmp")
+            rel=ga
+            ;;
+        rc[0-9]*|RC[0-9]*)
+            rel='rc'
+            ;;
+        *)
+            ;;
+    esac
+    otp="otp-$vsn-$rel"
+    ref="$($GIT show-ref --heads --hash "refs/heads/$branch")"
+    tmp="$otp_install_base/$otp/build.$os_type.$otp.txt"
+    if [[ ! -f "$tmp" || "$ref" != "$(head "$tmp" | sed -En \
+        's/^commit:[[:space:]]*([^[:space:]]+)[[:space:]]*$/\1/p')" ]]
+    then
+        echo "$sdir/otp.replace.as" "$work" "$otp"
+        for tmp in "${dests[@]}"
+        do
+            $GIT push --quiet "$tmp" "$branch"
+        done
+    fi
+    [[ $vsn -gt $vsn_min ]] || break
+    if [[ "$branch" == "maint-$vsn" ]] \
+    || ! $GIT checkout --quiet "maint-$vsn" 2>/dev/null
+    then
+        let 'vsn -= 1'
+    fi
+    branch="maint-$vsn"
+done

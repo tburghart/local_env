@@ -81,7 +81,7 @@ do
     if [[ ! -f "$tmp" || "$ref" != "$(head "$tmp" | sed -En \
         's/^commit:[[:space:]]*([^[:space:]]+)[[:space:]]*$/\1/p')" ]]
     then
-        echo "$sdir/otp.replace.as" "$work" "$otp"
+        "$sdir/otp.replace.as" "$work" "$otp"
         for tmp in "${dests[@]}"
         do
             $GIT push --quiet "$tmp" "$branch"

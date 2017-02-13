@@ -1014,6 +1014,23 @@ then
     alias rdeps="escript $TRB_PRJ_BASE/basho/erl_stuff/src/rebar_deps.erl"
 fi
 
+exports()
+{
+    if [[ $# -ne 1 || ! -f "$1" ]]
+    then
+        echo 'Usage: exports <exactly-one-beam-file>' >&2
+        return 1
+    fi
+    local dir="$(dirname "$1")"
+    local mod="$(basename "$1" .beam)"
+    local scr="M = $mod,"
+    scr+=' X = lists:sort(M:module_info(exports)'
+    scr+=' -- [{module_info, 0}, {module_info, 1}]),'
+    scr+=' F = fun({N, A}) -> io:format("    ~s/~b,~n", [N, A]) end,'
+    scr+=' lists:foreach(F, X), erlang:halt().'
+    erl -noshell -pa "$dir" -eval "$scr"
+}
+
 rth()
 {
     local file='.thumbs.yml'
@@ -1189,6 +1206,11 @@ ss()
     printf "$env_ss_format" 'rth' 'run all steps in the .thumbs.yml file in the current directory with the current OTP'
     printf "$env_ss_format" 'rtha' 'run all steps in the .thumbs.yml file in the current directory with OTP 16-GA'
     printf "$env_ss_format" 'rthax' 'run all steps in the .thumbs.yml file in the current directory with OTP 16-RC'
+    if [[ "$(typeof rdeps)" != 'undefined' ]]
+    then
+        printf "$env_ss_format" 'rdeps' '[-h|options]  write rebar dependencies'
+    fi
+    printf "$env_ss_format" 'exports' '<beam-file>  list export statements'
     echo ''
     printf "$env_ss_format" 'chdir' 'same as cd'
     printf "$env_ss_format" 'copyright' '[path] [prefix|style]  write a copyright header to stdout'
@@ -1224,10 +1246,6 @@ ss()
     if [[ "$(typeof pldump)" != 'undefined' ]]
     then
         printf "$env_ss_format" 'pldump' '<path>  dump plist file as xml'
-    fi
-    if [[ "$(typeof rdeps)" != 'undefined' ]]
-    then
-        printf "$env_ss_format" 'rdeps' '[-h|options]  write rebar dependencies'
     fi
     printf "$env_ss_format" 'remake' 'make clean && make'
     printf "$env_ss_format" 'rp' 'ruby tutorial'

@@ -165,6 +165,12 @@ do
     /bin/date >"$install_log"
     echo "$MAKE install" | tee -a "$install_log"
     $MAKE install 1>>"$install_log" 2>&1
+    if [[ $otp_src_vsn_major -ge 20 && ! -f "$otp_dest/bin/rebar3" ]]
+    then
+        echo "Installing $otp_dest/bin/rebar3" >>"$install_log"
+        wget -O "$otp_dest/bin/rebar3" 'https://s3.amazonaws.com/rebar3/rebar3'
+        /bin/chmod +x "$otp_dest/bin/rebar3"
+    fi
     /bin/date >>"$install_log"
 
     $ECP "$build_log" "$install_log" "$otp_dest"

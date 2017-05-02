@@ -1045,15 +1045,18 @@ rth()
         "s/^[[:space:]]+-[[:space:]]+(.+)[[:space:]]*\$/cmds[\${#cmds[@]}]='\\1'/p" \
         "$file" > "$temp"
     . "$temp"
-    /bin/rm "$temp"
+    printf '#!/bin/bash -e\n' > "$temp"
     local cmd
     for cmd in "${cmds[@]}"
     do
-        printf '>> %s\n' "$cmd"
-        $cmd
-        local ret=$?
-        [[ $ret -eq 0 ]] || return $ret
+        printf "echo '>> %s'\\n" "$cmd" >> "$temp"
+        printf '%s\n' "$cmd" >> "$temp"
     done
+    /bin/chmod +x "$temp"
+    "$temp"
+    local ret=$?
+    /bin/rm "$temp"
+    return $ret
 }
 alias rclean='/bin/rm -rf ebin _build .rebar .rebar3 .eunit rebar.lock'
 alias rtha='for n in 16 17 18 19 ; do . $LOCAL_OTP_DIR/otp-$n/activate ; rclean ; rth || break ; done'

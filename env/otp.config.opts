@@ -90,42 +90,28 @@ else
     otp_config_opts='--enable-64bit --with-ssl'
 fi
 
-if [[ $otp_src_vsn_major -ge 18 ]]
-then
-    otp_hipe_supported='true'
-    otp_hipe_default='true'
-
-elif [[ $otp_src_vsn_major -ge 17 ]]
-then
-    otp_hipe_supported='true'
-    case "$os_type" in
-        'linux'|'freebsd')
-            otp_hipe_default='true'
-            ;;
-        *)
-            otp_hipe_default='false'
-            ;;
-    esac
-
-elif [[ $otp_src_vsn_major -ge 16 ]]
-then
-    case "$os_type" in
-        'linux')
+otp_hipe_supported='false'
+case "$os_type" in
+    'linux')
+        if [[ $otp_src_vsn_major -ge 16 ]]
+        then
             otp_hipe_supported='true'
-            otp_hipe_default='true'
-            ;;
-        *)
-            otp_hipe_supported='false'
+        fi
+        ;;
+    'freebsd'|'sunos')
+        if [[ $otp_src_vsn_major -ge 17 ]]
+        then
+            otp_hipe_supported='true'
+        elif [[ $otp_src_vsn_major -ge 16 ]]
+        then
+            otp_hipe_supported='true'
             otp_hipe_default='false'
-            ;;
-    esac
+        fi
+        ;;
+esac
+[[ -n "$otp_hipe_default" ]] || otp_hipe_default="$otp_hipe_supported"
 
-else
-    otp_hipe_supported='false'
-    otp_hipe_default='false'
-fi
-
-if [[ $otp_src_vsn_major -ge 17 ]]
+if [[ $otp_src_vsn_major -ge 19 ]]
 then
     otp_config_opts+=' --enable-dirty-schedulers'
 fi

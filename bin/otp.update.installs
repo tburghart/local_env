@@ -1,4 +1,4 @@
-#!/bin/ksh -e
+#!/bin/bash -e
 # ========================================================================
 # Copyright (c) 2015-2017 T. R. Burghart
 #
@@ -32,9 +32,7 @@ export GIT
 . "$LOCAL_ENV_DIR/otp.install.base" || exit $?
 
 readonly  source='https://github.com/erlang/otp.git'
-set -A  dests \
-    'https://github.com/basho/otp.git' \
-    'https://github.com/tburghart/otp.git'
+readonly  dests='https://github.com/basho/otp.git https://github.com/tburghart/otp.git'
 
 readonly  work="$(mktemp -d /tmp/otp.XXXXXXX)"
 trap "/bin/rm -rf $work" EXIT
@@ -51,7 +49,7 @@ ref="$($GIT branch --list | sed -En \
     's/^[[:space:]]*\*[[:space:]]+([^[:space:]]+)[[:space:]]*$/\1/p')"
 if [[ "$ref" != "$branch" ]]
 then
-    for tmp in "${dests[@]}"
+    for tmp in $dests
     do
         $GIT push --quiet "$tmp" "$ref"
     done
@@ -82,7 +80,7 @@ do
         's/^commit:[[:space:]]*([^[:space:]]+)[[:space:]]*$/\1/p')" ]]
     then
         "$sdir/otp.replace.as" "$work" "$otp"
-        for tmp in "${dests[@]}"
+        for tmp in $dests
         do
             $GIT push --quiet "$tmp" "$branch"
         done

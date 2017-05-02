@@ -76,10 +76,20 @@ uid	:= $(or $(shell /usr/bin/id -u 2>/dev/null), \
 		$(error Can't figure out your UID))
 gid	:= $(or $(shell /usr/bin/id -g 2>/dev/null), \
 		$(error Can't figure out your GID))
+
+# whether to install files to /usr/local/bin
+lclinst	:= false
+
 ifeq	($(stype),darwin)
 adm_gid	:= admin
+ifneq	($(uid),0)
+lclinst	:= true
+endif
 else
 adm_gid	:= 0
+ifeq	($(uid),0)
+lclinst	:= true
+endif
 endif
 
 # try to get the actual login name, for the test below
@@ -222,7 +232,7 @@ home :: $(h_tgts)
 		$(HOME)/.*login $(HOME)/.*logout \
 		$(h_tgts) $(home_deprecated) ))
 
-ifneq	($(uid),0)
+ifeq	($(lclinst),true)
 home :: $(dl_tgts)
 endif
 

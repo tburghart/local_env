@@ -150,8 +150,8 @@ do
     docs_log="docs.$os_type.$otp_label.txt"
     install_log="install.$os_type.$otp_label.txt"
 
-    $GIT clean -fdqx -e /env -e /.idea/ -e '*.iml' -e '/*.txt' \
-    || $GIT clean -f -f -dqx -e /env -e /.idea/ -e '*.iml' -e '/*.txt' \
+    $GIT clean -fdqx -e /env -e /env.local -e /.idea/ -e '*.iml' -e '/*.txt' \
+    || $GIT clean -f -f -dqx -e /env -e /env.local -e /.idea/ -e '*.iml' -e '/*.txt' \
     || true
 
     [[ $makejobs -lt 2 ]] || export MAKEFLAGS="-j$makejobs"

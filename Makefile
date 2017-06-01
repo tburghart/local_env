@@ -111,13 +111,13 @@ else
 prof_d	:= false
 endif
 
-dl_cmd	:= $(shell which wget 2>/dev/null || true)
-ifneq ($(wildcard $(dl_cmd)),)
-dl_cmd	+= -O
-else
 dl_cmd	:= $(shell which curl 2>/dev/null || true)
 ifneq ($(wildcard $(dl_cmd)),)
-dl_cmd	+= -LRo
+dl_cmd	+= -SsLRo
+else
+dl_cmd	:= $(shell which wget 2>/dev/null || true)
+ifneq ($(wildcard $(dl_cmd)),)
+dl_cmd	+= -qNO
 else
 undefine dl_cmd
 $(warning Need curl or wget to download files)

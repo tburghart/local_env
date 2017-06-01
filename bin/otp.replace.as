@@ -122,6 +122,18 @@ case " $otp_config_opts " in
         ;;
 esac
 
+if type -P curl 1>/dev/null 2>&1
+then
+    dl_cmd="$(type -P curl) -SsLRo"
+elif type -P wget 1>/dev/null 2>&1
+then
+    dl_cmd="$(type -P wget) -qNO"
+else
+    echo "$sname: error: neither curl nor wget found" >&2
+    exit 2
+fi
+unset rebar3_dl
+
 for hipe in $hipe_modes
 do
     if $hipe
@@ -168,8 +180,14 @@ do
     if [[ $otp_src_vsn_major -ge 20 && ! -f "$otp_dest/bin/rebar3" ]]
     then
         echo "Installing $otp_dest/bin/rebar3" >>"$install_log"
-        wget -O "$otp_dest/bin/rebar3" 'https://s3.amazonaws.com/rebar3/rebar3'
-        /bin/chmod +x "$otp_dest/bin/rebar3"
+        if [[ -z "$rebar3_dl" ]]
+        then
+            rebar3_dl="$otp_dest/bin/rebar3"
+            $dl_cmd "$rebar3_dl" 'https://s3.amazonaws.com/rebar3/rebar3'
+            /bin/chmod +x "$rebar3_dl"
+        else
+            $ECP "$rebar3_dl" "$otp_dest/bin/rebar3"
+        fi
     fi
     /bin/date >>"$install_log"
 

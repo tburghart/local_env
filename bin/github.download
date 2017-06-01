@@ -54,31 +54,11 @@ else
     fi
 fi
 
+io_dir="$(mktemp -d /tmp/$$.XXXXXXX)"
+trap "/bin/rm -rf $io_dir" EXIT
+
 # download from-url to-file
-if type -P wget 1>/dev/null 2>&1
-then
-    download()
-    {
-        local url="$1"
-        local tgt="$2"
-        local ret
-        set +e
-        wget -qS -o "$io_dir/dl.head" -O "$tgt" "$url" \
-            1>"$io_dir/dl.out" 2>"$io_dir/dl.err"
-        ret=$?
-        set -e
-        if [[ $ret -eq 8 ]]
-        then
-            echo "$sname: error downloading $url" >&2
-            head -1 "$io_dir/dl.head" >&2
-        elif [[ $ret -ne 0 ]]
-        then
-            echo "$sname: error retrieving $tgt" >&2
-            cat "$io_dir/dl.err" >&2
-        fi
-        return $ret
-    }
-elif type -P curl 1>/dev/null 2>&1
+if type -P curl 1>/dev/null 2>&1
 then
     download()
     {
@@ -102,8 +82,31 @@ then
         fi
         return $ret
     }
+elif type -P wget 1>/dev/null 2>&1
+then
+    download()
+    {
+        local url="$1"
+        local tgt="$2"
+        local ret
+        set +e
+        wget -qS -o "$io_dir/dl.head" -O "$tgt" "$url" \
+            1>"$io_dir/dl.out" 2>"$io_dir/dl.err"
+        ret=$?
+        set -e
+        if [[ $ret -eq 8 ]]
+        then
+            echo "$sname: error downloading $url" >&2
+            head -1 "$io_dir/dl.head" >&2
+        elif [[ $ret -ne 0 ]]
+        then
+            echo "$sname: error retrieving $tgt" >&2
+            cat "$io_dir/dl.err" >&2
+        fi
+        return $ret
+    }
 else
-    echo "$sname: error: neither wget nor curl found" >&2
+    echo "$sname: error: neither curl nor wget found" >&2
     exit 2
 fi
 
@@ -126,9 +129,6 @@ then
         ECP='cp -p'
     fi
 fi
-
-io_dir="$(mktemp -d /tmp/$$.XXXXXXX)"
-trap "rm -rf $io_dir" EXIT
 
 download "$info_url" "$io_dir/gh.meta"
 filter='s/[[:space:]]*"download_url":[[:space:]]*"(.+)".*$/\1/p'

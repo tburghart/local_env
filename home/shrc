@@ -282,6 +282,9 @@ _copyright_owner()
     __cpy_own_dir=''
     __cpy_own_val=''
     case "$1" in
+        [wW]day*|[wW]orkday*)
+            __cpy_own_val='wday'
+            ;;
         [bB]asho*)
             __cpy_own_val='basho'
             ;;
@@ -307,7 +310,11 @@ _copyright_owner()
     esac
     if [[ -z "$__cpy_own_val" ]]
     then
-        if [[ -n "$BASHO_PRJ_BASE" \
+        if [[ -n "$WDAY_PRJ_BASE" \
+            && "$__cpy_own_dir/" == "$WDAY_PRJ_BASE/"* ]]
+        then
+            __cpy_own_val='wday'
+        elif [[ -n "$BASHO_PRJ_BASE" \
             && "$__cpy_own_dir/" == "$BASHO_PRJ_BASE/"* ]]
         then
             __cpy_own_val='basho'
@@ -437,6 +444,14 @@ copyright()
             ;;
     esac
     case "$__cpy_who" in
+        wday)
+            __cpy_ln='-------------------------------------------------------------------'
+            printf '%s %s\n' "$__cpy_pre" "$__cpy_ln"
+            printf '%s\n' "$__cpy_pre"
+            printf '%s Copyright (c) %u Workday, Inc.\n' "$__cpy_pre" "$(date '+%Y')"
+            printf '%s\n' "$__cpy_pre"
+            printf '%s %s\n' "$__cpy_pre" "$__cpy_ln"
+            ;;
         basho)
             __cpy_ln='-------------------------------------------------------------------'
             printf '%s %s\n' "$__cpy_pre" "$__cpy_ln"
@@ -809,6 +824,7 @@ alias rtconf="m ~/.riak_test.config"
 alias shconf="m ~/.shrc"
 alias shrc=". ~/.shrc"
 alias b="cd $BASHO_PRJ_BASE"
+alias d="cd $WDAY_PRJ_BASE"
 alias e="$MATE"
 alias t="cd $TRB_PRJ_BASE"
 
@@ -1193,6 +1209,7 @@ ss()
     printf "$env_ss_format" 'gy' '<path>  list commit years of one file'
     echo ''
     printf "$env_ss_format" 'b' 'cd ~/prj/basho'
+    printf "$env_ss_format" 'd' 'cd ~/prj/wday'
     printf "$env_ss_format" 't' 'cd ~/prj/tedb'
     printf "$env_ss_format" 'e' 'edit'
     printf "$env_ss_format" 'm' 'mate -m ...'

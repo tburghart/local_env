@@ -28,11 +28,54 @@ then
 fi
 export GIT
 
+if [[ -n "$network_restrict" ]]
+then
+    ipcfg='/usr/sbin/ipconfig'
+    if_match=false
+    for tmp in $network_restrict
+    do
+        case "$tmp" in
+            *:*)
+                if_name="${tmp%%:*}"
+                if_patt="${tmp#*:}"
+                if [[ "$("$ipcfg" getifaddr "$if_name")" == $if_patt ]]
+                then
+                    if_match=true
+                    break
+                fi
+                ;;
+            *)
+                if [[ -z "$if_list" ]]
+                then
+                    if_cnt="$("$ipcfg" ifcount)"
+                    if_cur=0
+                    while [[ $if_cur -lt $if_cnt ]]
+                    do
+                        if_list+=" $("$ipcfg" getifaddr en$if_cur || true) "
+                        let 'if_cur += 1'
+                    done
+                fi
+                if [[ "$if_list" == *" $tmp "* ]]
+                then
+                    if_match=true
+                    break
+                fi
+                ;;
+        esac
+    done
+    if ! $if_match
+    then
+        echo "$sname: skipping, not on a suitable network." >&2
+        exit 0
+    fi
+    unset ipcfg if_match if_name if_patt if_cnt if_cur if_list
+fi
+
 . "$LOCAL_ENV_DIR/os.type" || exit $?
 . "$LOCAL_ENV_DIR/otp.install.base" || exit $?
 
 readonly  source='https://github.com/erlang/otp.git'
-readonly  dests='https://github.com/basho/otp.git https://github.com/tburghart/otp.git'
+readonly  dests='https://github.com/tburghart/otp.git'
 
 readonly  work="$(mktemp -d /tmp/otp.XXXXXXX)"
 trap "/bin/rm -rf $work" EXIT

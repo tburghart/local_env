@@ -1,6 +1,6 @@
 #!/usr/bin/false This file is meant to be sourced
 # ========================================================================
-# Copyright (c) 1994-2016 T. R. Burghart.
+# Copyright (c) 1994-2017 T. R. Burghart.
 # 
 # Permission to use, copy, modify, and/or distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -39,9 +39,15 @@ else
 fi
 unset_vars='shell shome stype mtype usern'
 
-otp_check='/opt/basho /opt/local /usr/local'
+otp_check='/opt/erlang /opt/local /usr/local/erlang /usr/local'
 unset_vars="$unset_vars otp_check"
 
+if [[ -d "$HOME/prj/wday" ]]
+then
+    WDAY_PRJ_BASE="$HOME/prj/wday"
+    export WDAY_PRJ_BASE
+    otp_check+=" $WDAY_PRJ_BASE/local"
+fi
 if [[ -d "$HOME/prj/basho" ]]
 then
     BASHO_PRJ_BASE="$HOME/prj/basho"

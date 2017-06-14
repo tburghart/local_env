@@ -201,10 +201,10 @@ do
         echo "otp.gen.plt $otp_label" | tee -a "$install_log"
         otp.gen.plt "$otp_label" 1>>"$install_log" 2>&1
 
-        echo "/opt/QuickCheck/install_qc $otp_dest" | tee -a "$install_log"
-        if ! /opt/QuickCheck/install_qc "$otp_dest" 1>>"$install_log" 2>&1
-        then
-            echo 'Failed to install QuickCheck into' "$otp_dest" >&2
+		if [[ -f /opt/QuickCheck/install_qc && -x /opt/QuickCheck/install_qc ]]
+		then
+        	echo "/opt/QuickCheck/install_qc $otp_dest" | tee -a "$install_log"
+        	/opt/QuickCheck/install_qc "$otp_dest" 1>>"$install_log" 2>&1
         fi
         /bin/date >>"$install_log"
         $ECP "$install_log" "$otp_dest"

@@ -869,6 +869,7 @@ alias ga="$GIT add"
 alias gaa="$GIT add -A"
 alias gb="$GIT branch"
 alias gci="$GIT commit"
+alias gcl="$GIT clone"
 alias gco="$GIT checkout"
 alias gd="$GIT diff"
 alias gds="$GIT describe"
@@ -880,61 +881,6 @@ alias gpush="$GIT push"
 alias gr="$GIT remote"
 alias gs="$GIT status"
 alias gt="$GIT tag"
-
-gcl()
-{
-    if [[ $# -eq 0 ]]
-    then
-        echo 'Usage: gcl [-b branch] [args --] repo [directory]' >&2
-        echo '  repo: basho-repo-name | github-org/repo | git-url' >&2
-        return 1
-    fi
-    local -a args=("$@")
-    local -i argc="${#args[@]}"
-    local -i argx=0 urlx=0
-    while [[ $argx -lt $argc ]]
-    do
-        if [[ "${args[$argx]}" == '--' ]]
-        then
-            let 'urlx = (argx + 1)'
-            break
-        fi
-        let 'argx += 1'
-    done
-    if [[ $urlx -le $argx ]]
-    then
-        if [[ "${args[0]}" == '-b' ]]
-        then
-            argx=2
-        else
-            argx=0
-        fi
-        if [[ "${args[$argx]}" == -* ]]
-        then
-            echo 'Error: non-obvious switch, use -- or invoke directly.' >&2
-            return 1
-        else
-            urlx=$argx
-        fi
-    fi
-    local url="${args[$urlx]}"
-    case "$url" in
-        https:*|ssh:*|git:*|git@*)
-            if [[ "$1" != *.git ]]
-            then
-                url="$url.git"
-            fi
-            ;;
-        */*)
-            url="https://github.com/$url.git"
-            ;;
-        *)
-            url="https://github.com/basho/$url.git"
-            ;;
-    esac
-    args[$urlx]="$url"
-    $GIT clone "${args[@]}"
-}
 
 gscrub()
 {

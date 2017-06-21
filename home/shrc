@@ -882,6 +882,11 @@ alias gr="$GIT remote"
 alias gs="$GIT status"
 alias gt="$GIT tag"
 
+if [[ -d '/Applications/SourceTree.app' ]]
+then
+    alias st='open -a SourceTree'
+fi
+
 gscrub()
 {
     local arg
@@ -970,11 +975,6 @@ alias r19=". $LOCAL_OTP_DIR/otp-19/activate"
 alias r20=". $LOCAL_OTP_DIR/otp-20/activate"
 alias unkerl='kerl_deactivate'
 alias we='whence erl'
-
-if [[ -f "$TRB_PRJ_BASE/basho/erl_stuff/src/rebar_deps.erl" ]]
-then
-    alias rdeps="escript $TRB_PRJ_BASE/basho/erl_stuff/src/rebar_deps.erl"
-fi
 
 exports()
 {
@@ -1153,29 +1153,29 @@ ss()
     printf "$env_ss_format" 'gt' 'git tag'
     printf "$env_ss_format" 'gti' '<tag>  list info about one tag'
     printf "$env_ss_format" 'gy' '<path>  list commit years of one file'
+    if [[ "$(typeof st)" != 'undefined' ]]
+    then
+        printf "$env_ss_format" 'st' '<dir>  open <dir> in SourceTree'
+    fi
     echo ''
     printf "$env_ss_format" 'b' 'cd ~/prj/basho'
     printf "$env_ss_format" 'd' 'cd ~/prj/wday'
     printf "$env_ss_format" 't' 'cd ~/prj/tedb'
     printf "$env_ss_format" 'e' 'edit'
-    printf "$env_ss_format" 'm' 'mate -m ...'
+    printf "$env_ss_format" 'm' '[r]mate -m ...'
     echo ''
-    printf "$env_ss_format" 'r15' 'activate erlang R15..basho-current'
-    printf "$env_ss_format" 'r16' 'activate erlang R16..basho-current'
-    printf "$env_ss_format" 'r17' 'activate erlang OTP-17..basho-current'
-    printf "$env_ss_format" 'r18' 'activate erlang OTP-18..basho-current'
-    printf "$env_ss_format" 'r19' 'activate erlang OTP-19..basho-current'
-    printf "$env_ss_format" 'r20' 'activate erlang OTP-20..basho-current'
+    printf "$env_ss_format" 'r15' 'activate erlang R15-basho'
+    printf "$env_ss_format" 'r16' 'activate erlang R16-basho'
+    printf "$env_ss_format" 'r17' 'activate erlang OTP-17'
+    printf "$env_ss_format" 'r18' 'activate erlang OTP-18'
+    printf "$env_ss_format" 'r19' 'activate erlang OTP-19'
+    printf "$env_ss_format" 'r20' 'activate erlang OTP-20'
     printf "$env_ss_format" 'we' 'whence erl'
     printf "$env_ss_format" 'unkerl' 'kerl_deactivate'
     printf "$env_ss_format" 'rclean' 'delete rebar2/3 artifacts in the current directory'
     printf "$env_ss_format" 'rth' 'run all steps in the .thumbs.yml file in the current directory with the current OTP'
     printf "$env_ss_format" 'rtha' 'run all steps in the .thumbs.yml file in the current directory with OTP 16-GA'
     printf "$env_ss_format" 'rthax' 'run all steps in the .thumbs.yml file in the current directory with OTP 16-RC'
-    if [[ "$(typeof rdeps)" != 'undefined' ]]
-    then
-        printf "$env_ss_format" 'rdeps' '[-h|options]  write rebar dependencies'
-    fi
     printf "$env_ss_format" 'exports' '<beam-file>  list export statements'
     echo ''
     printf "$env_ss_format" 'chdir' 'same as cd'

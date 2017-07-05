@@ -1,6 +1,6 @@
 #!/usr/bin/false This file is meant to be sourced
 # ========================================================================
-# Copyright (c) 2014-2016 T. R. Burghart.
+# Copyright (c) 2014-2017 T. R. Burghart.
 # 
 # Permission to use, copy, modify, and/or distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -44,51 +44,73 @@ unset n
 . "$LOCAL_ENV_DIR/otp.source.version"
 . "$LOCAL_ENV_DIR/env.tool.defaults"
 
+addl_cc_flags=''
+
+if [[ $otp_src_vsn_major -lt 19 && "$os_type" == 'darwin' ]]
+then
+    otp_config_opts='--enable-darwin-64bit --with-cocoa'
+    # addl_cc_flags+=' -D_DARWIN_FEATURE_CLOCK_GETTIME=0'
+else
+    otp_config_opts='--enable-64bit'
+fi
+
+openssl_local=''
+[[ $otp_src_vsn_major -lt 20 ]] || \
+    openssl_local+=' /usr/local/openssl-1.1 /opt/local/openssl-1.1'
+openssl_local+=' /usr/local/openssl-1.0 /opt/local/openssl-1.0'
+openssl_local+=' /usr/local /opt/local'
+
+openssl_sdks=''
 if [[ "$os_type" == 'darwin' ]]
 then
-    if [[ $otp_src_vsn_major -ge 19 ]]
+    openssl_sdks+=' /Applications/Xcode.app/Contents/Developer/Toolchains'
+    openssl_sdks+='/XcodeDefault.xctoolchain/usr/lib/swift-migrator/sdk/MacOSX.sdk/usr'
+fi
+
+openssl_flags=''
+for openssl_base in $openssl_local
+do
+    if [[ -f "$openssl_base/include/openssl/crypto.h" ]]
     then
-        otp_config_opts='--enable-64bit'
-    else
-        otp_config_opts='--enable-darwin-64bit --with-cocoa'
+        openssl_flags="--with-ssl=$openssl_base --disable-dynamic-ssl-lib"
+        break
     fi
+done
+if [[ -z "$openssl_flags" ]]
+then
     if [[ -f '/usr/include/openssl/crypto.h' ]]
     then
-        otp_config_opts+=' --with-ssl'
-    elif [[ -f '/usr/local/include/openssl/crypto.h' ]]
+        openssl_flags='--with-ssl'
+    elif [[ -n "$openssl_sdks" ]]
     then
-        otp_config_opts+=' --with-ssl=/usr/local'
-        otp_config_opts+=' --disable-dynamic-ssl-lib'
-    else
-        xc_toolchains='/Applications/Xcode.app/Contents/Developer/Toolchains'
-        unset alt_sys_base
-        for n in \
-            'XcodeDefault.xctoolchain/usr/lib/swift-migrator/sdk/MacOSX.sdk'
+        for openssl_base in $openssl_sdks
         do
-            if [[ -f "$xc_toolchains/$n/usr/include/openssl/crypto.h" ]]
+            if [[ -f "$openssl_base/include/openssl/crypto.h" ]]
             then
-                alt_sys_base="$xc_toolchains/$n"
+                if [[ $otp_src_vsn_major -ge 17 ]]
+                then
+                    openssl_flags="--with-ssl=/usr --with-ssl-incl=$openssl_base"
+                else
+                    openssl_flags="--with-ssl=$openssl_base"
+                fi
                 break
             fi
         done
-        unset n
-        if [[ -z "$alt_sys_base" ]]
-        then
-            echo    'error: no OpenSSL headers found!' >&2
-            unset   xc_toolchains
-            return  2
-        fi
-        if [[ $otp_src_vsn_major -ge 17 ]]
-        then
-            otp_config_opts+=" --with-ssl=/usr --with-ssl-incl=$alt_sys_base/usr"
-        else
-            otp_config_opts+=" --with-ssl=$alt_sys_base/usr"
-        fi
-        unset alt_sys_base xc_toolchains
     fi
-else
-    otp_config_opts='--enable-64bit --with-ssl'
+    if [[ "$os_type" == 'linux' && -f /etc/redhat-release && ! -f /etc/fedora-release ]]
+    then
+        addl_cc_flags+=' -DOPENSSL_NO_EC=1'
+    fi
 fi
+unset openssl_base openssl_local openssl_sdks
+if [[ -z "$openssl_flags" ]]
+then
+    echo    'error: no OpenSSL headers found!' >&2
+    unset   openssl_flags
+    return  2
+fi
+otp_config_opts+=" $openssl_flags"
+unset openssl_flags
 
 otp_hipe_supported='false'
 case "$os_type" in
@@ -111,7 +133,7 @@ case "$os_type" in
 esac
 [[ -n "$otp_hipe_default" ]] || otp_hipe_default="$otp_hipe_supported"
 
-if [[ $otp_src_vsn_major -ge 19 ]]
+if [[ $otp_src_vsn_major -eq 19 ]]
 then
     otp_config_opts+=' --enable-dirty-schedulers'
 fi
@@ -124,35 +146,27 @@ then
     otp_config_opts+=' --with-wx --without-gs'
 fi
 
-[[ " $CFLAGS " == ' -g ' ]] || CFLAGS+=' -g'
-[[ " $LDFLAGS " == ' -g ' ]] || LDFLAGS+=' -g'
-[[ " $CXXFLAGS " == ' -g ' ]] || CXXFLAGS+=' -g'
-
-add_flags=''
-
-otp_config_opts+=' OMIT_OMIT_FP=yes'
-add_flags+=' -DERTS_FRMPTR'
-# add_flags+=' -D_DARWIN_FEATURE_CLOCK_GETTIME=0'
-
-if [[ -f /etc/redhat-release && ! -f /etc/fedora-release ]]
-then
-    add_flags+=' -DOPENSSL_NO_EC=1'
-fi
+# Basho standard builds include these, but I don't need them
+# [[ " $CFLAGS " == *' -g '* ]] || CFLAGS+=' -g'
+# [[ " $LDFLAGS " == *' -g '* ]] || LDFLAGS+=' -g'
+# [[ " $CXXFLAGS " == *' -g '* ]] || CXXFLAGS+=' -g'
+# otp_config_opts+=' OMIT_OMIT_FP=yes'
+# addl_cc_flags+=' -DERTS_FRMPTR'
 
 if [[ $otp_src_vsn_major -lt 17 ]]
 then
-    add_flags+=' -Wno-deprecated-declarations'
-    add_flags+=' -Wno-empty-body'
-    add_flags+=' -Wno-implicit-function-declaration'
-    add_flags+=' -Wno-parentheses-equality'
-    add_flags+=' -Wno-pointer-sign'
-    add_flags+=' -Wno-tentative-definition-incomplete-type'
-    add_flags+=' -Wno-unused-function'
-    add_flags+=' -Wno-unused-value'
-    add_flags+=' -Wno-unused-variable'
+    addl_cc_flags+=' -Wno-deprecated-declarations'
+    addl_cc_flags+=' -Wno-empty-body'
+    addl_cc_flags+=' -Wno-implicit-function-declaration'
+    addl_cc_flags+=' -Wno-parentheses-equality'
+    addl_cc_flags+=' -Wno-pointer-sign'
+    addl_cc_flags+=' -Wno-tentative-definition-incomplete-type'
+    addl_cc_flags+=' -Wno-unused-function'
+    addl_cc_flags+=' -Wno-unused-value'
+    addl_cc_flags+=' -Wno-unused-variable'
 fi
 
-CFLAGS+="$add_flags"
-CXXFLAGS+="$add_flags"
-unset   add_flags
+CFLAGS+="$addl_cc_flags"
+CXXFLAGS+="$addl_cc_flags"
+unset   addl_cc_flags
 export  CFLAGS CXXFLAGS

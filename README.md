@@ -10,7 +10,9 @@ The odds of them being how YOU want to do it are sketchy, at best._
 I develop software for a living, and at present my primary languages are Erlang, C, C++, and a LOT of shell scripts.
 The stuff in here is used across numerous Unix-y systems.
 Despite misgivings, I've pretty much settled on [Bash][] as my default shell, but I write most significant scripts to use [Ksh][].
-That may be changing slowly, but back in the olde days Ksh had some significant benefits over Bash, and I've just stuck with it.
+That may be changing slowly, but back in the olde days\* Ksh had some significant benefits over Bash, and I've just stuck with it.
+> \* Some of these files predate Bash, as do I, hence my Ksh bias.
+> I _think_ the origins of the oldest ones in here was on AIX 3.x with Ksh, but it's possible some _might_ have been from older SunOS environents a few years before that (in which case I should rewind the copyright dates, but I have no idea to what) whose shells were an older and quirkier variant of Ksh.
 
 ## Where The Pieces Go
 

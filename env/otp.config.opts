@@ -145,6 +145,10 @@ if [[ $otp_src_vsn_major -ge 17 ]]
 then
     otp_config_opts+=' --with-wx --without-gs'
 fi
+if [[ $otp_src_vsn_major -lt 18 ]]
+then
+    addl_cc_flags+=' -w'
+fi
 
 # Basho standard builds include these, but I don't need them
 # [[ " $CFLAGS " == *' -g '* ]] || CFLAGS+=' -g'
@@ -152,19 +156,6 @@ fi
 # [[ " $CXXFLAGS " == *' -g '* ]] || CXXFLAGS+=' -g'
 # otp_config_opts+=' OMIT_OMIT_FP=yes'
 # addl_cc_flags+=' -DERTS_FRMPTR'
-
-if [[ $otp_src_vsn_major -lt 17 ]]
-then
-    addl_cc_flags+=' -Wno-deprecated-declarations'
-    addl_cc_flags+=' -Wno-empty-body'
-    addl_cc_flags+=' -Wno-implicit-function-declaration'
-    addl_cc_flags+=' -Wno-parentheses-equality'
-    addl_cc_flags+=' -Wno-pointer-sign'
-    addl_cc_flags+=' -Wno-tentative-definition-incomplete-type'
-    addl_cc_flags+=' -Wno-unused-function'
-    addl_cc_flags+=' -Wno-unused-value'
-    addl_cc_flags+=' -Wno-unused-variable'
-fi
 
 CFLAGS+="$addl_cc_flags"
 CXXFLAGS+="$addl_cc_flags"

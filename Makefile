@@ -1,5 +1,5 @@
 # ========================================================================
-# Copyright (c) 2014-2016 T. R. Burghart.
+# Copyright (c) 2014-2018 T. R. Burghart.
 # 
 # Permission to use, copy, modify, and/or distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -158,7 +158,7 @@ INSTUL	:= $(LNUSR)
 INSTUX	:= $(INSTUSR) -m 0755
 
 # files to be installed from downloads defined elsewhere
-dl_tgts	:= /usr/local/bin/rmate /usr/local/bin/rebar3
+dl_tgts	:= /usr/local/bin/rmate /usr/local/bin/rebar /usr/local/bin/rebar3
 
 # these will be wildcard patterns, sort to remove duplicates
 sh_etc	:= $(sort profile ksh.kshrc bashrc kshrc shrc zshenv zprofile zshrc)
@@ -306,17 +306,35 @@ $(HOME)/.zshrc : $(HOME)/.shrc
 ifeq	($(dl_cmd),)
 $(warning Skipping download/check of $(dl_tgts))
 else
+escript	:= $(or $(shell which escript), \
+		$(lastword $(wildcard $(if \
+        $(LOCAL_OTP_DIR),$(LOCAL_OTP_DIR),/opt/erlang)/otp-??-ga/bin/escript)))
 
-/usr/local/bin/rmate : /tmp/ledl/rmate
-	$(INSTAX) -p $< $@
-
-/usr/local/bin/rebar3 : /tmp/ledl/rebar3
+/usr/local/bin/% : /tmp/ledl/%
 	$(INSTAX) -p $< $@
 
 /tmp/ledl/rmate :
 	@test -d $(@D) || /bin/mkdir -p $(@D)
 	@echo Downloading $@ ...
 	@$(prjdir)/bin/github.download textmate rmate bin/rmate $@
+
+# if no escript, sets the hard-coded timestamp from rebar v2.6.4
+/tmp/ledl/rebar :
+	@test -d $(@D) || /bin/mkdir -p $(@D)
+	@echo Downloading $@ ...
+	@$(dl_cmd) $@ https://github.com/rebar/rebar/wiki/rebar
+	@echo '#!/bin/bash -e' >$@.sts
+	@echo 'if [[ -z "$$2" ]]' >>$@.sts
+	@echo 'then' >>$@.sts
+	@echo '    echo Warning: Missing escript, using hard-coded Rebar file time >&2' >>$@.sts
+	@echo '    touch -t 201608311451.36 "$$1"' >>$@.sts
+	@echo '    exit $$?' >>$@.sts
+	@echo 'fi' >>$@.sts
+	@echo 'ts="$$("$$2" "$$1" -V | tr -d _ | \\' >>$@.sts
+	@echo "    awk '{print substr(\$$4,1,12) \".\" substr(\$$4,13,14)}')\"" >>$@.sts
+	@echo 'touch -t "$$ts" "$$1"' >>$@.sts
+	@chmod +x $@.sts
+	@$@.sts $@ "$(escript)"
 
 /tmp/ledl/rebar3 :
 	@test -d $(@D) || /bin/mkdir -p $(@D)

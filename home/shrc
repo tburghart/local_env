@@ -1,6 +1,6 @@
 #!/usr/bin/false This file is meant to be sourced
 # ========================================================================
-# Copyright (c) 1994-2017 T. R. Burghart.
+# Copyright (c) 1994-2018 T. R. Burghart.
 # 
 # Permission to use, copy, modify, and/or distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -252,11 +252,13 @@ _copyright_style()
     case "$1" in
         [cC]|*.c|*.h)
             echo c      ;;
-        [cC][cC]|[cC][pP][pP]|*.cc|*.C|*.cpp|*.hh|*.H|*.hpp)
+        [cC][cC]|[cC][pP][pP]|[jJ][aA][vV][aA]|*.cc|*.C|*.cpp|*.hh|*.H|*.hpp|*.java)
+            echo cc     ;;
+        [jJ][aA][vV][aA]|*.java)
             echo cc     ;;
         erl|*.erl|*.hrl)
             echo erl    ;;
-        sh|*.mk|*.*sh|Makefile)
+        py|sh|*.mk|*.py|*.*sh|Makefile)
             echo sh     ;;
         [sS][qQ][lL]|[dD][dD][lL]|*.[sS][qQ][lL]|*.[dD][dD][lL])
             echo sql    ;;
@@ -322,6 +324,10 @@ _copyright_owner()
             && "$__cpy_own_dir/" == "$TRB_PRJ_BASE/"* ]]
         then
             __cpy_own_val='trb'
+        elif [[ -n "$R3R_PRJ_BASE" \
+            && "$__cpy_own_dir/" == "$R3R_PRJ_BASE/"* ]]
+        then
+            __cpy_own_val='r3r'
         else
             __cpy_own_val="${LOGNAME:-${USER:-$(id -un)}}"
         fi
@@ -447,16 +453,18 @@ copyright()
         wday)
             __cpy_ln='-------------------------------------------------------------------'
             printf '%s %s\n' "$__cpy_pre" "$__cpy_ln"
-            printf '%s\n' "$__cpy_pre"
             printf '%s Copyright (c) %u Workday, Inc.\n' "$__cpy_pre" "$(date '+%Y')"
-            printf '%s\n' "$__cpy_pre"
             printf '%s %s\n' "$__cpy_pre" "$__cpy_ln"
             ;;
-        basho)
+        basho|r3r)
+            case "$__cpy_who" in
+                r3r)    __cpy_name='R3R Contributors' ;;
+                basho)  __cpy_name='Basho Technologies, Inc.' ;;
+            esac
             __cpy_ln='-------------------------------------------------------------------'
             printf '%s %s\n' "$__cpy_pre" "$__cpy_ln"
             printf '%s\n' "$__cpy_pre"
-            printf '%s Copyright (c) %u Basho Technologies, Inc.\n' "$__cpy_pre" "$(date '+%Y')"
+            printf '%s Copyright (c) %u %s\n' "$__cpy_pre" "$(date '+%Y')" "$__cpy_name"
             printf '%s\n' "$__cpy_pre"
             printf '%s This file is provided to you under the Apache License,\n' "$__cpy_pre"
             printf '%s Version 2.0 (the "License"); you may not use this file\n' "$__cpy_pre"
@@ -473,6 +481,7 @@ copyright()
             printf '%s under the License.\n' "$__cpy_pre"
             printf '%s\n' "$__cpy_pre"
             printf '%s %s\n' "$__cpy_pre" "$__cpy_ln"
+            unset __cpy_name
             ;;
         *)
             __cpy_ln='========================================================================'
@@ -735,6 +744,7 @@ newscr()
             printf '#!%s\n' "$s" > "$2"
             ;;
     esac
+    unset e s
     printf '\n\n' >> "$2"
     /bin/chmod +x "$2"
 }
@@ -823,10 +833,11 @@ alias rtconf="m ~/.riak_test.config"
 alias shconf="m ~/.shrc"
 alias shrc=". ~/.shrc"
 alias th='export HISTFILE="$(/bin/ls -1 /tmp/tsh.??????? 2>/dev/null || /usr/bin/mktemp /tmp/tsh.XXXXXXX)"'
-alias b="cd $BASHO_PRJ_BASE"
-alias d="cd $WDAY_PRJ_BASE"
 alias e="$MATE"
-alias t="cd $TRB_PRJ_BASE"
+[[ -z "$BASHO_PRJ_BASE" ]] || alias b="cd $BASHO_PRJ_BASE"
+[[ -z "$WDAY_PRJ_BASE" ]] || alias d="cd $WDAY_PRJ_BASE"
+[[ -z "$TRB_PRJ_BASE" ]] || alias t="cd $TRB_PRJ_BASE"
+[[ -z "$R3R_PRJ_BASE" ]] || alias rr="cd $R3R_PRJ_BASE"
 
 # Idea IDE(s)
 __shrc_ideajdks="$(/bin/ls -1d \
@@ -973,6 +984,7 @@ alias r17=". $LOCAL_OTP_DIR/otp-17/activate"
 alias r18=". $LOCAL_OTP_DIR/otp-18/activate"
 alias r19=". $LOCAL_OTP_DIR/otp-19/activate"
 alias r20=". $LOCAL_OTP_DIR/otp-20/activate"
+alias r21=". $LOCAL_OTP_DIR/otp-21/activate"
 alias unkerl='kerl_deactivate'
 alias we='whence erl'
 
@@ -1157,9 +1169,10 @@ ss()
         printf "$env_ss_format" 'st' '<dir>  open <dir> in SourceTree'
     fi
     echo ''
-    printf "$env_ss_format" 'b' 'cd ~/prj/basho'
-    printf "$env_ss_format" 'd' 'cd ~/prj/wday'
-    printf "$env_ss_format" 't' 'cd ~/prj/tedb'
+    [[ -z "$BASHO_PRJ_BASE" ]] || printf "$env_ss_format" 'b' 'cd ~/prj/basho'
+    [[ -z "$WDAY_PRJ_BASE" ]] || printf "$env_ss_format" 'd' 'cd ~/prj/wday'
+    [[ -z "$TRB_PRJ_BASE" ]] || printf "$env_ss_format" 't' 'cd ~/prj/tedb'
+    [[ -z "$R3R_PRJ_BASE" ]] || printf "$env_ss_format" 'rr' 'cd ~/prj/r3r'
     printf "$env_ss_format" 'e' 'edit'
     printf "$env_ss_format" 'm' '[r]mate -m ...'
     echo ''
@@ -1169,6 +1182,7 @@ ss()
     printf "$env_ss_format" 'r18' 'activate erlang OTP-18'
     printf "$env_ss_format" 'r19' 'activate erlang OTP-19'
     printf "$env_ss_format" 'r20' 'activate erlang OTP-20'
+    printf "$env_ss_format" 'r21' 'activate erlang OTP-21'
     printf "$env_ss_format" 'we' 'whence erl'
     printf "$env_ss_format" 'unkerl' 'kerl_deactivate'
     printf "$env_ss_format" 'rclean' 'delete rebar2/3 artifacts in the current directory'

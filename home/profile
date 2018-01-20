@@ -1,6 +1,6 @@
 #!/usr/bin/false This file is meant to be sourced
 # ========================================================================
-# Copyright (c) 1994-2017 T. R. Burghart.
+# Copyright (c) 1994-2018 T. R. Burghart.
 # 
 # Permission to use, copy, modify, and/or distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -47,6 +47,11 @@ then
     WDAY_PRJ_BASE="$HOME/prj/wday"
     export WDAY_PRJ_BASE
     otp_check+=" $WDAY_PRJ_BASE/local"
+fi
+if [[ -d "$HOME/prj/r3r" ]]
+then
+    R3R_PRJ_BASE="$HOME/prj/r3r"
+    export R3R_PRJ_BASE
 fi
 if [[ -d "$HOME/prj/basho" ]]
 then

@@ -1,6 +1,6 @@
 #!/bin/bash -e
 # ========================================================================
-# Copyright (c) 2015-2017 T. R. Burghart.
+# Copyright (c) 2015-2018 T. R. Burghart.
 # 
 # Permission to use, copy, modify, and/or distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -24,6 +24,10 @@ readonly  spath="$sdir/$sname"
 
 readonly  makejobs='5'
 readonly  verbosity="${V:-0}"
+
+# Script taking a destination OTP installation directory.
+# Do NOT define this without an active license!
+# readonly  qc_inst='/opt/QuickCheck/install_qc'
 
 usage()
 {
@@ -161,7 +165,7 @@ do
     $GIT show-ref --heads --head --hash | head -1 >>"$build_log"
     /bin/date >>"$build_log"
     env | sort >>"$build_log"
-    echo "./otp_build setup -a $build_cfg" | tee -a "$build_log"
+    echo "==> ./otp_build setup -a $build_cfg" | tee -a "$build_log"
     ./otp_build setup -a $build_cfg 1>>"$build_log" 2>&1
     /bin/date >>"$build_log"
 
@@ -175,46 +179,40 @@ do
     fi
 
     /bin/date >"$install_log"
-    echo "$MAKE install" | tee -a "$install_log"
+    echo "==> $MAKE install" | tee -a "$install_log"
     $MAKE install 1>>"$install_log" 2>&1
-    if [[ $otp_src_vsn_major -ge 20 && ! -f "$otp_dest/bin/rebar3" ]]
-    then
-        echo "Installing $otp_dest/bin/rebar3" >>"$install_log"
-        if [[ -z "$rebar3_dl" ]]
-        then
-            rebar3_dl="$otp_dest/bin/rebar3"
-            $dl_cmd "$rebar3_dl" 'https://s3.amazonaws.com/rebar3/rebar3'
-            /bin/chmod +x "$rebar3_dl"
-        else
-            $ECP "$rebar3_dl" "$otp_dest/bin/rebar3"
-        fi
-    fi
     /bin/date >>"$install_log"
 
-    $ECP "$build_log" "$install_log" "$otp_dest"
     [[ -e "$otp_dest/activate" ]] || \
         ln -s "$LOCAL_ENV_DIR/otp.activate" "$otp_dest/activate"
 
     if [[ "$otp_install_base/otp-$otp_src_vsn_major" -ef "$otp_dest" ]]
     then
-        # run this before installing QuickCheck - no debug info in EQC beams
-        echo "otp.gen.plt $otp_label" | tee -a "$install_log"
-        otp.gen.plt "$otp_label" 1>>"$install_log" 2>&1
-
-		if [[ -f /opt/QuickCheck/install_qc && -x /opt/QuickCheck/install_qc ]]
-		then
-        	echo "/opt/QuickCheck/install_qc $otp_dest" | tee -a "$install_log"
-        	/opt/QuickCheck/install_qc "$otp_dest" 1>>"$install_log" 2>&1
-        fi
-        /bin/date >>"$install_log"
-        $ECP "$install_log" "$otp_dest"
-
         /bin/date >"$docs_log"
-        echo "$MAKE docs install-docs" | tee -a "$docs_log"
+        echo "==> $MAKE docs install-docs" | tee -a "$docs_log"
         $MAKE docs install-docs 1>>"$docs_log" 2>&1
-        echo "otp.gen.doc.index $otp_label" | tee -a "$docs_log"
-        otp.gen.doc.index "$otp_label" >>"$docs_log"
+        echo '==>' "$sdir/otp.gen.doc.index" "$otp_label" | tee -a "$docs_log"
+        "$sdir/otp.gen.doc.index" "$otp_label" >>"$docs_log"
         /bin/date >>"$docs_log"
         $ECP $docs_log "$otp_dest"
+
+        # Run dialyzer before installing QuickCheck - no debug info in EQC beams
+        if [[ $otp_src_vsn_major -lt 18 ]]
+        then
+            printf '!!! %s\n' \
+                "Skipping old OTP-$otp_src_vsn_major PLT generation" \
+                'Run manually (if you dare) with:' | tee -a "$install_log"
+            printf '!!!\t%s\n' "$sdir/otp.gen.plt $otp_label" | tee -a "$install_log"
+        else
+            echo '==>' "$sdir/otp.gen.plt" "$otp_label" | tee -a "$install_log"
+            "$sdir/otp.gen.plt" "$otp_label" 1>>"$install_log" 2>&1
+        fi
+        if [[ -n "qc_inst" && -f "$qc_inst" && -x "$qc_inst" ]]
+        then
+            echo '==>' "$qc_inst" "$otp_dest" | tee -a "$install_log"
+            "$qc_inst" "$otp_dest" 1>>"$install_log" 2>&1
+        fi
+        /bin/date >>"$install_log"
     fi
+    $ECP "$build_log" "$install_log" "$otp_dest"
 done

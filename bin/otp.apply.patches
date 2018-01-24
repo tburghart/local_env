@@ -1,0 +1,48 @@
+#!/bin/bash -e
+# ========================================================================
+# Copyright (c) 2018 T. R. Burghart
+#
+# Permission to use, copy, modify, and/or distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+# ========================================================================
+#
+# Apply known patches to the current OTP development environment.
+#
+
+readonly  sdir="$(cd "$(dirname "$0")" && pwd)"
+readonly  sname="${0##*/}"
+readonly  spath="$sdir/$sname"
+readonly  ppath="$(dirname "${LOCAL_ENV_DIR:-${sdir}}")/patch/otp"
+
+readonly ERL_TOP="${1:-${ERL_TOP}}"
+if [[ -z "$ERL_TOP" || ! -d "$ERL_TOP" ]] || ! cd "$ERL_TOP"
+then
+    echo "Usage: $sname [<otp-source-dir>]" >&2
+    echo '    if no OTP source directory is specified, defaults to $ERL_TOP' >&2
+    exit 1
+fi
+export ERL_TOP
+
+readonly tf="$(mktemp /tmp/oap.XXXXXXX)"
+trap "/bin/rm $tf" EXIT
+
+for pf in "$ppath"/*
+do
+    if $GIT apply "$pf" 2>"$tf"
+    then
+        printf 'patched %s\n' "$(head -1 "$pf" | $ESED 's/^.+[[:space:]].\/(.+)$/\1/')"
+    elif [[ "$(tail -1 "$tf")" != *patch\ does\ not\ apply* ]]
+    then
+        cat "$tf"
+        exit 2
+    fi
+done

@@ -1,6 +1,6 @@
 #!/usr/bin/false This file is meant to be sourced
 # ========================================================================
-# Copyright (c) 2014-2016 T. R. Burghart.
+# Copyright (c) 2014-2018 T. R. Burghart.
 # 
 # Permission to use, copy, modify, and/or distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -29,8 +29,8 @@
 #   If the result contains directory separators, they are replaced with dashes
 #
 
-[[ -z "$otp_name" ]] || return 0
 [[ " $env_local_unset " == *\ otp_name\ * ]] || env_local_unset+=' otp_name'
+[[ -z "$otp_name" ]] || return 0
 
 . "$LOCAL_ENV_DIR/otp.source.base"
 . "$LOCAL_ENV_DIR/otp.install.base"

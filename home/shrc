@@ -458,7 +458,7 @@ copyright()
             ;;
         basho|r3r)
             case "$__cpy_who" in
-                r3r)    __cpy_name='R3R Contributors' ;;
+                r3r)    __cpy_name='Rebar3Riak Contributors' ;;
                 basho)  __cpy_name='Basho Technologies, Inc.' ;;
             esac
             __cpy_ln='-------------------------------------------------------------------'
@@ -977,16 +977,38 @@ gy()
     cd "$cwd"
 }
 
+rth()
+{
+    local file='.travis.yml'
+    if [[ ! -f "$file" ]]
+    then
+        echo 'No Travis-CI file' >&2
+        return 2
+    fi
+    local -a cmds
+    local temp="$(mktemp /tmp/tt.XXXXXXX)"
+    $ESED -n \
+        "s/^[[:space:]]+-[[:space:]]+(.+)[[:space:]]*\$/cmds+=\\('\\1'\\)/p" \
+        "$file" > "$temp"
+    . "$temp"
+    printf '#!/bin/bash -e\n' > "$temp"
+    local cmd
+    for cmd in "${cmds[@]}"
+    do
+        printf "echo '==> %s'\\n" "$cmd" >> "$temp"
+        printf '%s\n' "$cmd" >> "$temp"
+    done
+    /bin/chmod +x "$temp"
+    "$temp"
+    local ret=$?
+    /bin/rm "$temp"
+    return $ret
+}
+
 # Erlang
-alias r15=". $LOCAL_OTP_DIR/otp-15/activate"
-alias r16=". $LOCAL_OTP_DIR/otp-16/activate"
-alias r17=". $LOCAL_OTP_DIR/otp-17/activate"
-alias r18=". $LOCAL_OTP_DIR/otp-18/activate"
-alias r19=". $LOCAL_OTP_DIR/otp-19/activate"
-alias r20=". $LOCAL_OTP_DIR/otp-20/activate"
-alias r21=". $LOCAL_OTP_DIR/otp-21/activate"
-alias unkerl='kerl_deactivate'
-alias we='whence erl'
+
+otp_ga=($(/bin/ls -1 $LOCAL_OTP_DIR | sed -En 's/^otp-([1-9][0-9])-ga$/\1/p' | sort -u | tail -3))
+otp_rc="$((${otp_ga##* } + 1))"
 
 exports()
 {
@@ -1005,36 +1027,49 @@ exports()
     erl -noshell -pa "$dir" -eval "$scr"
 }
 
-rth()
-{
-    local file='.thumbs.yml'
-    if [[ ! -f "$file" ]]
-    then
-        echo No Thumbs file >&2
-        return 2
-    fi
-    local -a cmds
-    local temp="$(mktemp /tmp/tt.XXXXXXX)"
-    $ESED -n \
-        "s/^[[:space:]]+-[[:space:]]+(.+)[[:space:]]*\$/cmds[\${#cmds[@]}]='\\1'/p" \
-        "$file" > "$temp"
-    . "$temp"
-    printf '#!/bin/bash -e\n' > "$temp"
-    local cmd
-    for cmd in "${cmds[@]}"
-    do
-        printf "echo '>> %s'\\n" "$cmd" >> "$temp"
-        printf '%s\n' "$cmd" >> "$temp"
-    done
-    /bin/chmod +x "$temp"
-    "$temp"
-    local ret=$?
-    /bin/rm "$temp"
-    return $ret
-}
+alias we='whence erl'
+alias unkerl='kerl_deactivate'
 alias rclean='/bin/rm -rf ebin _build .rebar .rebar3 .eunit rebar.lock'
-alias rtha='for n in 16 17 18 19 ; do . $LOCAL_OTP_DIR/otp-$n/activate ; rclean ; rth || break ; done'
-alias rthax='for n in 16 17 18 19 20 ; do . $LOCAL_OTP_DIR/otp-$n/activate ; rclean ; rth || break ; done'
+
+declare -a env_otp_acts
+if [[ -d "$LOCAL_OTP_DIR" ]]
+then
+    declare -a otp_ga
+    last_ga=''
+    for n in $LOCAL_OTP_DIR/otp-[1-9][0-9]
+    do
+        a="$n/activate"
+        [[ -L "$n" && -f "$a" ]] || continue
+        c=${n##*-}
+        alias "r$c=. $a"
+        env_otp_acts+=($c)
+        r="$(readlink $n)"
+        if [[ "$r" == "${n##*/}-ga" || "$r" == "${n}-ga" ]]
+        then
+            last_ga=$c
+            otp_ga+=($c)
+        fi
+    done
+    if [[ -n "$last_ga" ]]
+    then
+        c=${#otp_ga[@]}
+        [[ $c -le 3 ]] || otp_ga=($(cut -d ' ' -f $(($c - 2))- <<<"${otp_ga[*]}"))
+        alias rtha="rthv ${otp_ga[*]}"
+        alias rthax="rthv ${otp_ga[*]} $(($last_ga + 1))"
+    fi
+    unset a c r last_ga otp_ga
+fi
+
+rthv()
+{
+    local vsn
+    for vsn in "$@"
+    do
+        . $LOCAL_OTP_DIR/otp-$vsn/activate || return $?
+        rclean || return $?
+        rth || return $?
+    done
+}
 
 lel()
 {
@@ -1164,10 +1199,8 @@ ss()
     printf "$env_ss_format" 'gt' 'git tag'
     printf "$env_ss_format" 'gti' '<tag>  list info about one tag'
     printf "$env_ss_format" 'gy' '<path>  list commit years of one file'
-    if [[ "$(typeof st)" != 'undefined' ]]
-    then
+    [[ "$(typeof st)" == 'undefined' ]] || \
         printf "$env_ss_format" 'st' '<dir>  open <dir> in SourceTree'
-    fi
     echo ''
     [[ -z "$BASHO_PRJ_BASE" ]] || printf "$env_ss_format" 'b' 'cd ~/prj/basho'
     [[ -z "$WDAY_PRJ_BASE" ]] || printf "$env_ss_format" 'd' 'cd ~/prj/wday'
@@ -1176,19 +1209,22 @@ ss()
     printf "$env_ss_format" 'e' 'edit'
     printf "$env_ss_format" 'm' '[r]mate -m ...'
     echo ''
-    printf "$env_ss_format" 'r15' 'activate erlang R15-basho'
-    printf "$env_ss_format" 'r16' 'activate erlang R16-basho'
-    printf "$env_ss_format" 'r17' 'activate erlang OTP-17'
-    printf "$env_ss_format" 'r18' 'activate erlang OTP-18'
-    printf "$env_ss_format" 'r19' 'activate erlang OTP-19'
-    printf "$env_ss_format" 'r20' 'activate erlang OTP-20'
-    printf "$env_ss_format" 'r21' 'activate erlang OTP-21'
+    if [[ ${#env_otp_acts[@]} -gt 0 ]]
+    then
+        for n in "${env_otp_acts[@]}"
+        do
+            printf "$env_ss_format" "r$n" "activate Erlang/OTP $n"
+        done
+    fi
     printf "$env_ss_format" 'we' 'whence erl'
     printf "$env_ss_format" 'unkerl' 'kerl_deactivate'
     printf "$env_ss_format" 'rclean' 'delete rebar2/3 artifacts in the current directory'
-    printf "$env_ss_format" 'rth' 'run all steps in the .thumbs.yml file in the current directory with the current OTP'
-    printf "$env_ss_format" 'rtha' 'run all steps in the .thumbs.yml file in the current directory with OTP 16-GA'
-    printf "$env_ss_format" 'rthax' 'run all steps in the .thumbs.yml file in the current directory with OTP 16-RC'
+    printf "$env_ss_format" 'rth' 'run all steps in the local .travis.yml file with the current environment'
+    printf "$env_ss_format" 'rthv' '<Version> ...  run all steps in the local .travis.yml file with OTP-Version(s)'
+    [[ "$(typeof rtha)" != 'alias' ]] || \
+        printf "$env_ss_format" 'rtha' 'run all steps in the local .travis.yml file with current OTP GAs'
+    [[ "$(typeof rthax)" != 'alias' ]] || \
+        printf "$env_ss_format" 'rthax' 'run all steps in the local .travis.yml file with current OTP GAs + RC'
     printf "$env_ss_format" 'exports' '<beam-file>  list export statements'
     echo ''
     printf "$env_ss_format" 'chdir' 'same as cd'
@@ -1197,10 +1233,8 @@ ss()
     printf "$env_ss_format" 'df' 'df -h'
     printf "$env_ss_format" 'dircp' 'copy directory with pax'
     printf "$env_ss_format" 'dirpath' 'echo the fully-qualified directory name of the argument'
-    if [[ "$(typeof dscl)" != 'undefined' ]]
-    then
+    [[ "$(typeof dscl)" == 'undefined' ]] || \
         printf "$env_ss_format" 'dscl' 'dscl -raw .'
-    fi
     printf "$env_ss_format" 'ecp' 'cp -p without EAs'
     printf "$env_ss_format" 'egrep' 'grep with EREs'
     printf "$env_ss_format" 'esed' 'sed with EREs'
@@ -1211,10 +1245,8 @@ ss()
         printf "$env_ss_format" 'ideaerls' 'edit idea Erlang (JDK) table'
     fi
     printf "$env_ss_format" 'isvar' 'is argument an environment variable'
-    if [[ "$(typeof lchflags)" != 'undefined' ]]
-    then
+    [[ "$(typeof lchflags)" == 'undefined' ]] || \
         printf "$env_ss_format" 'lchflags' 'chflags -h'
-    fi
     printf "$env_ss_format" 'ldd' 'list dynamic lib dependencies'
     printf "$env_ss_format" 'newbash' '<path>  create a bash executable script'
     printf "$env_ss_format" 'newes' '<path>  create an escript executable script'
@@ -1222,25 +1254,19 @@ ss()
     printf "$env_ss_format" 'newscr' '<interpretter> <path>  create an executable script'
     printf "$env_ss_format" 'newsh' '<path>  create a sh executable script'
     printf "$env_ss_format" 'newzsh' '<path>  create a zsh executable script'
-    if [[ "$(typeof pldump)" != 'undefined' ]]
-    then
+    [[ "$(typeof pldump)" == 'undefined' ]] || \
         printf "$env_ss_format" 'pldump' '<path>  dump plist file as xml'
-    fi
     printf "$env_ss_format" 'remake' 'make clean && make'
     printf "$env_ss_format" 'rp' 'ruby tutorial'
     printf "$env_ss_format" 'rtconf' 'edit riak_test config'
     printf "$env_ss_format" 'th' 'set HISTFILE to disposable temp file'
     printf "$env_ss_format" 'typeof' 'type of command argument is interpretted as'
-    if [[ "$(typeof unhide)" != 'undefined' ]]
-    then
+    [[ "$(typeof unhide)" == 'undefined' ]] || \
         printf "$env_ss_format" 'unhide' 'chflags -h nohidden'
-    fi
     printf "$env_ss_format" 'utcs' 'print current time as UTC seconds'
     printf "$env_ss_format" 'utcs2d' '<UtcSecs>  print default time string'
-    if [[ "$(typeof wget)" == 'alias' ]]
-    then
+    [[ "$(typeof wget)" != 'alias' ]] || \
         printf "$env_ss_format" 'wget' 'curl --remote-name-all'
-    fi
     printf "$env_ss_format" 'whence' 'ksh-like whence'
     printf "$env_ss_format" 'whereis' 'find all instances of command'
     echo ''
@@ -1251,10 +1277,8 @@ ss()
     printf "$env_ss_format" 'reset_lenv' 'unload current custom environment'
     printf "$env_ss_format" 'sss' 'display environment maintenance commands'
     printf "$env_ss_format" 'ss' 'display global environment commands'
-    if [[ "$(typeof s)" != 'undefined' ]]
-    then
+    [[ "$(typeof s)" == 'undefined' ]] || \
         printf "$env_ss_format" 's' 'display custom environment commands'
-    fi
     echo ''
 }
 
@@ -1271,3 +1295,5 @@ sss()
     printf "$env_ss_format" 'shconf' 'edit shell rc'
     printf "$env_ss_format" 'shrc' 'reload shell rc'
 }
+
+unset n

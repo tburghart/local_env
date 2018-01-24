@@ -1,6 +1,6 @@
 #!/usr/bin/false This file is meant to be sourced
 # ========================================================================
-# Copyright (c) 2014-2017 T. R. Burghart.
+# Copyright (c) 2014-2018 T. R. Burghart.
 # 
 # Permission to use, copy, modify, and/or distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -30,19 +30,23 @@
 #       enable or disable HiPE.
 #
 
-[[ -z "$otp_config_opts" ]] || return 0
-
 # variables that will be set here
 unset otp_hipe_default otp_hipe_supported
 for n in otp_config_opts otp_hipe_default otp_hipe_supported
 do
     [[ " $env_local_unset " == *\ $n\ * ]] || env_local_unset+=" $n"
 done
-unset n
+[[ -z "$otp_config_opts" ]] || return 0
 
-. "$LOCAL_ENV_DIR/os.type"
-. "$LOCAL_ENV_DIR/otp.source.version"
-. "$LOCAL_ENV_DIR/env.tool.defaults"
+for n in \
+    os.type \
+    otp.source.version \
+    env.tool.defaults \
+    ssl.install.data
+do
+    . "$LOCAL_ENV_DIR/$n"
+done
+unset n
 
 addl_cc_flags=''
 
@@ -56,9 +60,9 @@ fi
 
 openssl_local=''
 [[ $otp_src_vsn_major -lt 20 ]] || \
-    openssl_local+=' /usr/local/openssl-1.1 /opt/local/openssl-1.1'
-openssl_local+=' /usr/local/openssl-1.0 /opt/local/openssl-1.0'
-openssl_local+=' /usr/local /opt/local'
+    openssl_local+=" /usr/local/openssl-1.1 $ssl_install_base/openssl-1.1"
+openssl_local+=" /usr/local/openssl-1.0 $ssl_install_base/openssl-1.0"
+openssl_local+=" /usr/local $ssl_install_base"
 
 openssl_sdks=''
 if [[ "$os_type" == 'darwin' ]]
@@ -80,14 +84,22 @@ if [[ -z "$openssl_flags" ]]
 then
     if [[ -f '/usr/include/openssl/crypto.h' ]]
     then
-        openssl_flags='--with-ssl'
+        if [[ -f '/usr/lib/libcrypto.a' ]]
+        then
+            openssl_flags='--with-ssl --disable-dynamic-ssl-lib'
+        else
+            openssl_flags='--with-ssl'
+        fi
     elif [[ -n "$openssl_sdks" ]]
     then
         for openssl_base in $openssl_sdks
         do
             if [[ -f "$openssl_base/include/openssl/crypto.h" ]]
             then
-                if [[ $otp_src_vsn_major -ge 17 ]]
+                if [[ -f "$openssl_base/usr/lib/libcrypto.a" ]]
+                then
+                    openssl_flags="--with-ssl=$openssl_base --disable-dynamic-ssl-lib"
+                elif [[ $otp_src_vsn_major -ge 17 ]]
                 then
                     openssl_flags="--with-ssl=/usr --with-ssl-incl=$openssl_base"
                 else
@@ -105,7 +117,7 @@ fi
 unset openssl_base openssl_local openssl_sdks
 if [[ -z "$openssl_flags" ]]
 then
-    echo    'error: no OpenSSL headers found!' >&2
+    echo    'error: no OpenSSL SDK found!' >&2
     unset   openssl_flags
     return  2
 fi
@@ -149,13 +161,6 @@ if [[ $otp_src_vsn_major -lt 18 ]]
 then
     addl_cc_flags+=' -w'
 fi
-
-# Basho standard builds include these, but I don't need them
-# [[ " $CFLAGS " == *' -g '* ]] || CFLAGS+=' -g'
-# [[ " $LDFLAGS " == *' -g '* ]] || LDFLAGS+=' -g'
-# [[ " $CXXFLAGS " == *' -g '* ]] || CXXFLAGS+=' -g'
-# otp_config_opts+=' OMIT_OMIT_FP=yes'
-# addl_cc_flags+=' -DERTS_FRMPTR'
 
 CFLAGS+="$addl_cc_flags"
 CXXFLAGS+="$addl_cc_flags"

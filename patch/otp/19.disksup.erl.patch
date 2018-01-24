@@ -1,0 +1,13 @@
+diff --git a/lib/os_mon/src/disksup.erl b/lib/os_mon/src/disksup.erl
+index 23c7ebbe99..e868d0e9e2 100644
+--- a/lib/os_mon/src/disksup.erl
++++ b/lib/os_mon/src/disksup.erl
+@@ -285,7 +285,7 @@ check_disk_space({unix, sunos4}, Port, Threshold) ->
+     Result = my_cmd("df", Port),
+     check_disks_solaris(skip_to_eol(Result), Threshold);
+ check_disk_space({unix, darwin}, Port, Threshold) ->
+-    Result = my_cmd("/bin/df -i -k -t ufs,hfs", Port),
++    Result = my_cmd("/bin/df -i -k -t ufs,hfs,apfs", Port),
+     check_disks_susv3(skip_to_eol(Result), Threshold).
+ 
+ % This code works for Linux and FreeBSD as well

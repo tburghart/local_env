@@ -1,6 +1,6 @@
 #!/usr/bin/false This file is meant to be sourced
 # ========================================================================
-# Copyright (c) 2014-2016 T. R. Burghart.
+# Copyright (c) 2014-2018 T. R. Burghart.
 # 
 # Permission to use, copy, modify, and/or distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -38,8 +38,6 @@
 # variables are not set.
 #
 
-[[ -z "$otp_install_version" ]] || return 0
-
 # variables that will be set here
 unset otp_inst_release otp_inst_vsn_major otp_inst_vsn_minor
 for n in otp_inst_dir otp_inst_release otp_inst_vsn_major otp_inst_vsn_minor otp_install_version
@@ -47,6 +45,7 @@ do
     [[ " $env_local_unset " == *\ $n\ * ]] || env_local_unset+=" $n"
 done
 unset n
+[[ -z "$otp_install_version" ]] || return 0
 
 if [[ -z "$otp_inst_dir" ]]
 then

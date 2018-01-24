@@ -1,6 +1,6 @@
 #!/bin/bash -e
 # ========================================================================
-# Copyright (c) 2015-2017 T. R. Burghart.
+# Copyright (c) 2015-2018 T. R. Burghart.
 #
 # Permission to use, copy, modify, and/or distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -62,14 +62,16 @@ do
     otp_plt_apps+=" $app"
 done
 
-/bin/rm -f "$otp_plt_file"
+/bin/rm -f "$otp_inst_dir"/otp.*.plt
 
 echo Creating PLT "$otp_plt_file" ...
-set +e
-"$otp_inst_dir/bin/dialyzer" --quiet \
+plt_ret=0
+[[ $otp_inst_vsn_major -ge 18 ]] || \
+    echo '==>' "$otp_inst_dir/bin/dialyzer" --quiet \
     --build_plt --output_plt "$otp_plt_file" --apps $otp_plt_apps
-plt_ret=$?
-set -e
+"$otp_inst_dir/bin/dialyzer" --quiet \
+    --build_plt --output_plt "$otp_plt_file" --apps $otp_plt_apps \
+    || plt_ret=$?
 
 # work around a call to a nonexistant function in eunit_test
 if [[ $plt_ret -eq 2 ]]

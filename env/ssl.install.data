@@ -1,0 +1,16 @@
+#!/usr/bin/false This file is meant to be sourced
+
+if [[ -z "$ssl_install_base" ]]
+then
+    ssl_install_base='/opt/local'
+    [[ " $env_reset_unset " == *\ ssl_install_base\ * ]] || \
+        env_reset_unset+=' ssl_install_base'
+fi
+
+if [[ -z "$openssl_branches" ]]
+then
+    openssl_branches+=' openssl-1.0=OpenSSL_1_0_2-stable'
+    openssl_branches+=' openssl-1.1=OpenSSL_1_1_0-stable'
+    [[ " $env_reset_unset " == *\ openssl_branches\ * ]] || \
+        env_reset_unset+=' openssl_branches'
+fi

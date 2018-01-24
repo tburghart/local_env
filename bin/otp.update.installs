@@ -1,6 +1,6 @@
 #!/bin/bash -e
 # ========================================================================
-# Copyright (c) 2015-2017 T. R. Burghart
+# Copyright (c) 2015-2018 T. R. Burghart
 #
 # Permission to use, copy, modify, and/or distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -20,10 +20,26 @@ readonly  sdir="$(cd "$(dirname "$0")" && pwd)"
 readonly  sname="${0##*/}"
 readonly  spath="$sdir/$sname"
 
-[[ -n "$GIT" && -f "$GIT" && -x "$GIT" ]] || GIT="$(whence -p git)"
+replace_flags=''
+
+for n in "$@"
+do
+    case "$n" in
+        -h[012])
+            replace_flags="$n"
+            ;;
+        *)
+            echo "$sname: error: illegal switch '$n'" >&2
+            exit 1
+            ;;
+    esac
+done
+readonly replace_flags
+
+[[ -n "$GIT" && -f "$GIT" && -x "$GIT" ]] || GIT="$(whence -P git)"
 if [[ -z "$GIT" ]]
 then
-    echo "$sname: error: git not found." >&2
+    echo "$sname: error: git executable not found." >&2
     exit 1
 fi
 export GIT
@@ -82,9 +98,10 @@ trap "/bin/rm -rf $work" EXIT
 
 typeset -ir vsn_min=17
 typeset -i  vsn
-typeset     otp ref rel tmp
+typeset     ext log otp ref rel tmp
 typeset     branch='master'
 
+echo "==> $GIT clone --quiet '$source' '$work'"
 $GIT clone --quiet "$source" "$work"
 cd "$work"
 
@@ -94,6 +111,7 @@ if [[ "$ref" != "$branch" ]]
 then
     for tmp in $dests
     do
+        echo "==> $GIT push --quiet '$tmp' '$ref'"
         $GIT push --quiet "$tmp" "$ref"
     done
 fi
@@ -102,7 +120,8 @@ fi
 
 while true
 do
-    $GIT checkout --quiet "$branch"
+    echo "==> $GIT checkout --force --quiet '$branch'"
+    $GIT checkout --force --quiet "$branch"
     tmp="$(<OTP_VERSION)"
     vsn="${tmp%%.*}"
     rel="${tmp##*-}"
@@ -117,20 +136,35 @@ do
             ;;
     esac
     otp="otp-$vsn-$rel"
-    ref="$($GIT show-ref --heads --hash "refs/heads/$branch")"
-    tmp="$otp_install_base/$otp/build.$os_type.$otp.txt"
-    if [[ ! -f "$tmp" || "$ref" != "$(head "$tmp" | sed -En \
-        's/^commit:[[:space:]]*([^[:space:]]+)[[:space:]]*$/\1/p')" ]]
+    ext="$os_type.$otp.txt"
+    log="$otp_install_base/$otp/build.$ext"
+    if [[ -f "$log" && "$(head "$log" | sed -En \
+        's/^commit:[[:space:]]*([^[:space:]]+)[[:space:]]*$/\1/p')" \
+        == "$($GIT show-ref --heads --hash "refs/heads/$branch")" ]]
     then
-        "$sdir/otp.replace.as" "$work" "$otp"
+        echo "Skipping '$otp_install_base/$otp' - up to date"
+    else
         for tmp in $dests
         do
+            echo "==> $GIT push --quiet '$tmp' '$branch'"
             $GIT push --quiet "$tmp" "$branch"
         done
+        echo '==>' "$sdir/otp.apply.patches" "$work"
+        if "$sdir/otp.apply.patches" "$work"
+        then
+            echo '==>' "$sdir/otp.replace.as" $replace_flags "$work" "$otp"
+            if "$sdir/otp.replace.as" $replace_flags "$work" "$otp"
+            then
+                /bin/rm -rf /tmp/*."$ext"
+            else
+                /bin/mv *."$ext" /tmp
+                echo "!!! error log(s) saved as /tmp/*.$ext"
+            fi
+        fi
     fi
     [[ $vsn -gt $vsn_min ]] || break
     if [[ "$branch" == "maint-$vsn" ]] \
-    || ! $GIT checkout --quiet "maint-$vsn" 2>/dev/null
+    || ! $GIT checkout --force --quiet "maint-$vsn" 2>/dev/null
     then
         let 'vsn -= 1'
     fi

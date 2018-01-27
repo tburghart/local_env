@@ -27,12 +27,12 @@ readonly  spath="$sdir/$sname"
 
 if [[ $# -ne 1 ]]
 then
-    echo "Usage: $sname local-otp-release-name (under 'local' install path)" >&2
-    echo "       * local install path is '$otp_install_base'" >&2
+    echo "Usage: $sname <local-otp-release-name>*" >&2
+    echo "    * under local install path '$otp_install_base'" >&2
     exit 1
 fi
 
-readonly  otp_inst_dir="$otp_install_base/$1" 
+readonly otp_inst_dir="$otp_install_base/$1" 
 
 if [[ ! -d "$otp_inst_dir" ]]
 then
@@ -43,12 +43,12 @@ fi
 
 cd "$otp_inst_dir"
 
-readonly  otp_plt_file="$otp_inst_dir/otp.$otp_install_version.plt"
+readonly otp_plt_file="otp.$otp_install_version.plt"
 
 otp_plt_apps='erts'
 
 # apps in this list won't be added to otp_plt_apps
-plt_skip_apps="$otp_plt_apps"
+readonly plt_skip_apps="$otp_plt_apps"
 
 for dir in lib/erlang/lib/*-*
 do
@@ -61,21 +61,43 @@ do
 
     otp_plt_apps+=" $app"
 done
+readonly otp_plt_apps
 
-/bin/rm -f "$otp_inst_dir"/otp.*.plt
+readonly tmp_out="$(mktemp /tmp/ogp.XXXXXXX)"
+readonly tmp_tmp="$(mktemp /tmp/ogp.XXXXXXX)"
+trap "/bin/rm $tmp_out $tmp_tmp" EXIT
+
+readonly tmp_plt="/tmp/$otp_plt_file"
+readonly dst_plt="$otp_inst_dir/$otp_plt_file"
 
 echo Creating PLT "$otp_plt_file" ...
-plt_ret=0
-[[ $otp_inst_vsn_major -ge 18 ]] || \
-    echo '==>' "$otp_inst_dir/bin/dialyzer" --quiet \
-    --build_plt --output_plt "$otp_plt_file" --apps $otp_plt_apps
-"$otp_inst_dir/bin/dialyzer" --quiet \
-    --build_plt --output_plt "$otp_plt_file" --apps $otp_plt_apps \
-    || plt_ret=$?
+declare -i plt_ret=0
 
-# work around a call to a nonexistant function in eunit_test
-if [[ $plt_ret -eq 2 ]]
+readonly -a cmd=("$otp_inst_dir/bin/dialyzer" --quiet \
+    --build_plt --output_plt "$tmp_plt" --apps $otp_plt_apps)
+
+"${cmd[@]}" 1>"$tmp_tmp" 2>&1 || plt_ret=$?
+
+if [[ -s "$tmp_tmp" ]]
 then
-    plt_ret=0
+    # don't trust the return code of various grep implimentations
+    grep -Ev '^[[:space:]]*$|\beunit_test:nonexisting_function/0\b' \
+        "$tmp_tmp" >"$tmp_out" || true
+    # work around a call to nonexistant function in eunit_test
+    if [[ $plt_ret -eq 2 && ! -s "$tmp_out" ]]
+    then
+        plt_ret=0
+    fi
 fi
+
+if [[ $plt_ret -ne 0 ]]
+then
+    echo '==>' "${cmd[@]}"
+    [[ ! -s "$tmp_out" ]] || cat "$tmp_out" >&2
+else
+    [[ ! -s "$tmp_out" ]] || cat "$tmp_out"
+    /bin/rm -f "$otp_inst_dir"/otp.*.plt
+    /bin/mv "$tmp_plt" "$dst_plt"
+fi
+
 exit $plt_ret

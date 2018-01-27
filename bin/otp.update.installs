@@ -20,23 +20,35 @@ readonly  sdir="$(cd "$(dirname "$0")" && pwd)"
 readonly  sname="${0##*/}"
 readonly  spath="$sdir/$sname"
 
-replace_flags=''
+usage_exit()
+{
+    echo 'Usage:' "$sname" '[options]' >&2
+    echo 'Options:' >&2
+    # keep options in sync with 'otp.replace.as'
+    echo '    -h{0|1|2} 0=without HiPE, 1=with HiPE, 2=both, default auto' >&2
+    echo '    -d{0|1}   0=force docs off, 1=force docs on, default auto' >&2
+    echo '    -p{0|1}   0=force PLT off, 1=force PLT on, default auto' >&2
+    exit 1
+}
 
-for n in "$@"
+declare -a replace_flags
+
+for opt in "$@"
 do
-    case "$n" in
+    case "$opt" in
+        -d[01])
+            replace_flags[0]="$opt" ;;
         -h[012])
-            replace_flags="$n"
-            ;;
-        *)
-            echo "$sname: error: illegal switch '$n'" >&2
-            exit 1
-            ;;
+            replace_flags[1]="$opt" ;;
+        -p[01])
+            replace_flags[2]="$opt" ;;
+        *)  echo "$sname: error: illegal option '$opt'" >&2
+            usage_exit ;;
     esac
 done
 readonly replace_flags
 
-[[ -n "$GIT" && -f "$GIT" && -x "$GIT" ]] || GIT="$(whence -P git)"
+[[ -n "$GIT" && -f "$GIT" && -x "$GIT" ]] || GIT="$(type -P git)"
 if [[ -z "$GIT" ]]
 then
     echo "$sname: error: git executable not found." >&2
@@ -152,8 +164,8 @@ do
         echo '==>' "$sdir/otp.apply.patches" "$work"
         if "$sdir/otp.apply.patches" "$work"
         then
-            echo '==>' "$sdir/otp.replace.as" $replace_flags "$work" "$otp"
-            if "$sdir/otp.replace.as" $replace_flags "$work" "$otp"
+            echo '==>' "$sdir/otp.replace.as" "${replace_flags[@]}" "$work" "$otp"
+            if "$sdir/otp.replace.as" "${replace_flags[@]}" "$work" "$otp"
             then
                 /bin/rm -rf /tmp/*."$ext"
             else

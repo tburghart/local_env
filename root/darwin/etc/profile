@@ -1,6 +1,6 @@
 #!/usr/bin/false This file is meant to be sourced
 # ========================================================================
-# Copyright (c) 1994-2016 T. R. Burghart.
+# Copyright (c) 1994-2018 T. R. Burghart.
 # 
 # Permission to use, copy, modify, and/or distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -26,9 +26,9 @@ then
 	eval `/usr/libexec/path_helper -s`
 fi
 
-#
-# below here *should* be common accross platforms
-#
+# ========================================================================
+# Below here *should* be common accross platforms.
+# ========================================================================
 
 # some platforms default to being lenient with non-system umasks, but I'm not
 umask 022
@@ -48,6 +48,7 @@ fi
 if [ -n "$ZSH_VERSION" ]
 then
     __sh_sh=zsh
+    __sh_which='whence -p'
     if [[ -o interactive ]]
     then
         __sh_interactive=true
@@ -63,6 +64,7 @@ then
 elif [ -n "$BASH_VERSION" ]
 then
     __sh_sh=bash
+    __sh_which='type -P'
     case "$-" in
         *i*)  __sh_interactive=true   ;;
         *)    unset __sh_interactive  ;;
@@ -76,6 +78,7 @@ then
 elif [ -n "$KSH_VERSION" ]
 then
     __sh_sh=ksh
+    __sh_which='whence -p'
     if [[ -n "$PS1" ]]
     then
         __sh_interactive=true
@@ -88,6 +91,22 @@ then
     esac
 else
     __sh_sh=sh
+    #
+    # See if we're in a shell that has a suitable builtin to use as 'which'.
+    # Use 'mkdir' as our test target, since it's almost certainly an actual
+    # executable file on the $PATH.
+    #
+    if whence -p mkdir 1>/dev/null 2>&1 \
+        && [ `whence -p mkdir 2>&1` = */mkdir ]
+    then
+        __sh_which='whence -p'
+    elif type -P mkdir 1>/dev/null 2>&1 \
+        && [ `type -P mkdir 2>&1` = */mkdir ]
+    then
+        __sh_which='type -P'
+    else
+        __sh_which='which'
+    fi
     if [ -n "$PS1" ]
     then
         __sh_interactive=true
@@ -100,13 +119,13 @@ else
     esac
 fi
 
-# see if we can assure that $SHELL is set to something sane
+# see if we can ensure that $SHELL is set to something sane
 if [ -z "$SHELL" -o ! -f "$SHELL" ]
 then
     __prf_fn=`basename "$SHELL"`
     if [ "$__prf_fn" != "$__sh_sh" -a "$__prf_fn" != "r$__sh_sh" ]
     then
-        for __prf_sh in /bin/$__sh_sh /usr/bin/$__sh_sh `which $__sh_sh 2>/dev/null`
+        for __prf_sh in /bin/$__sh_sh /usr/bin/$__sh_sh `$__sh_which $__sh_sh 2>/dev/null`
         do
             if [ -f "$__prf_sh" -a -x "$__prf_sh" ]
             then
@@ -120,7 +139,7 @@ then
     unset __prf_fn
 fi
 
-# history management varies by shell, but the recognized variables' are 
+# history management varies by shell, but the recognized variables are 
 # consistent enough that we just set them regardless of the specific shell
 HISTCONTROL='erasedups'
 HISTFILE="$HOME/.sh_history"

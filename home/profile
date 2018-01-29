@@ -39,6 +39,40 @@ else
 fi
 unset_vars='shell shome stype mtype usern'
 
+# Hopefully we'll pick this up from /etc/profile having been sourced.
+if [ -z "$__sh_which" ]
+then
+    #
+    # Order shell tests to check for those that may be emulating others before
+    # checking for those that may be emulated by them.
+    #
+    if [[ -n "$ZSH_VERSION" ]]
+    then
+        __sh_which='whence -p'
+    elif [[ -n "$BASH_VERSION" ]]
+    then
+        __sh_which='type -P'
+    elif [[ -n "$KSH_VERSION" ]]
+    then
+        __sh_which='whence -p'
+    #
+    # See if we're in a shell that has a suitable builtin to use as 'which'.
+    # Use 'mkdir' as our test target, since it's almost certainly an actual
+    # executable file on the $PATH.
+    #
+    elif whence -p mkdir 1>/dev/null 2>&1 \
+        && [ `whence -p mkdir 2>&1` = */mkdir ]
+    then
+        __sh_which='whence -p'
+    elif type -P mkdir 1>/dev/null 2>&1 \
+        && [ `type -P mkdir 2>&1` = */mkdir ]
+    then
+        __sh_which='type -P'
+    else
+        __sh_which='which'
+    fi
+fi
+
 otp_check='/opt/erlang /opt/local /usr/local/erlang /usr/local'
 unset_vars="$unset_vars otp_check"
 
@@ -81,13 +115,14 @@ done
 export LOCAL_OTP_DIR
 
 pathbeg="$ledir /usr/local /opt/local"
+pathadd=''
 if [[ "$stype" == 'SunOS' ]]
 then
-    pathbeg="$pathbeg /usr/xpg6 /usr/xpg4"
+    pathbeg="$pathbeg /usr/gnu /usr/xpg6 /usr/xpg4"
+    pathadd="$pathadd /usr/ucb"
 fi
 pathbeg="$pathbeg /usr /opt"
 pathend='/usr/local/cuda /usr/local/mysql'
-pathadd=''
 bpath=''
 spath=''
 unset_vars="$unset_vars pathbeg pathend pathadd bpath spath"
@@ -177,45 +212,49 @@ then
         ECP='/bin/cp -p'
     fi
 fi
-[[ -n "$EGREP" ]] || EGREP="$(which egrep 2>/dev/null || echo egrep)"
-if [[ -z "$ESED" ]]
-then
-    if [[ "$stype" == 'Linux' ]]
-    then
-        ESED='/usr/bin/sed -r'
-    else
-        ESED='/usr/bin/sed -E'
-    fi
-fi
-[[ -n "$GIT" ]] || GIT="$(which git 2>/dev/null || echo git)"
+[[ -n "$EGREP" ]] || EGREP="$($__sh_which grep 2>/dev/null || echo grep) -E"
+[[ -n "$ESED" ]] || ESED="$($__sh_which sed 2>/dev/null || echo sed) -E"
+[[ -n "$GIT" ]] || GIT="$($__sh_which git 2>/dev/null || echo git)"
 if [[ -z "$MAKE" ]]
 then
     case "$stype" in
         Darwin|Linux)
-            MAKE="$(type -p /usr/bin/make \
-                || which make 2>/dev/null || which gmake 2>/dev/null || echo make)"
+            MAKE="$($__sh_which /usr/bin/make 2>/dev/null \
+                || $__sh_which make 2>/dev/null \
+                || $__sh_which gmake 2>/dev/null || echo make)"
             ;;
         *)
-            MAKE="$(which gmake 2>/dev/null || which make 2>/dev/null || echo gmake)"
+            MAKE="$($__sh_which gmake 2>/dev/null \
+                || $__sh_which make 2>/dev/null || echo gmake)"
             ;;
     esac
 fi
 [[ -n "$REBAR" ]] || \
-    REBAR="$(which /usr/local/bin/rebar 2>/dev/null || which rebar 2>/dev/null || echo rebar)"
+    REBAR="$($__sh_which /usr/local/bin/rebar 2>/dev/null \
+        || $__sh_which rebar 2>/dev/null || echo rebar)"
 [[ -n "$REBAR3" ]] || \
-    REBAR3="$(which /usr/local/bin/rebar3 2>/dev/null || which rebar3 2>/dev/null || echo rebar3)"
+    REBAR3="$($__sh_which /usr/local/bin/rebar3 2>/dev/null \
+        || $__sh_which rebar3 2>/dev/null || echo rebar3)"
 export ECP EGREP ESED GIT LANG MAKE REBAR REBAR3
 
 BLOCKSIZE=1024
-for EDITOR in $(which vi 2>/dev/null) $(which vim 2>/dev/null) $(which nano 2>/dev/null) vi ; do break ; done
-for PAGER in $(which less 2>/dev/null) $(which more 2>/dev/null) more ; do break ; done
+for EDITOR in $($__sh_which vi 2>/dev/null) \
+    $($__sh_which vim 2>/dev/null) $($__sh_which nano 2>/dev/null) vi
+do
+    break
+done
+for PAGER in $($__sh_which less 2>/dev/null) \
+    $($__sh_which more 2>/dev/null) more
+do
+    break
+done
 export BLOCKSIZE EDITOR PAGER
 
 if [[ -n "$SSH_TTY" ]]
 then
-    MATE="$(which rmate 2>/dev/null)"
+    MATE="$($__sh_which rmate 2>/dev/null)"
 else
-    MATE="$(which mate 2>/dev/null)"
+    MATE="$($__sh_which mate 2>/dev/null)"
 fi
 if [[ -n "$MATE" ]]
 then
@@ -225,7 +264,7 @@ else
     unset MATE
     if [[ -z "$VISUAL" ]]
     then
-        VISUAL="$(which tedit 2>/dev/null)"
+        VISUAL="$($__sh_which tedit 2>/dev/null)"
         [[ -n "$VISUAL" ]] || VISUAL="$EDITOR"
     fi
 fi

@@ -1,11 +1,62 @@
+#!/usr/bin/false This file is meant to be sourced
+# ========================================================================
+# Copyright (c) 2013-2018 T. R. Burghart.
+# 
+# Permission to use, copy, modify, and/or distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+# 
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+# ========================================================================
 #
 # local Common Aliases file
 #
 
-# basics
-if [ -z "$(which wget 2>/dev/null)" ]
+# Hopefully we'll pick this up from being set in /etc/profile, but it's not
+# exported so check in case we're not in the login shell.
+if [ -z "$__sh_which" ]
 then
-    x="$(which curl 2>/dev/null)"
+    #
+    # Order shell tests to check for those that may be emulating others before
+    # checking for those that may be emulated by them.
+    #
+    if [[ -n "$ZSH_VERSION" ]]
+    then
+        __sh_which='whence -p'
+    elif [[ -n "$BASH_VERSION" ]]
+    then
+        __sh_which='type -P'
+    elif [[ -n "$KSH_VERSION" ]]
+    then
+        __sh_which='whence -p'
+    #
+    # See if we're in a shell that has a suitable builtin to use as 'which'.
+    # Use 'mkdir' as our test target, since it's almost certainly an actual
+    # executable file on the $PATH.
+    #
+    elif whence -p mkdir 1>/dev/null 2>&1 \
+        && [ `whence -p mkdir 2>&1` = */mkdir ]
+    then
+        __sh_which='whence -p'
+    elif type -P mkdir 1>/dev/null 2>&1 \
+        && [ `type -P mkdir 2>&1` = */mkdir ]
+    then
+        __sh_which='type -P'
+    else
+        __sh_which='which'
+    fi
+fi
+
+# basics
+if [ -z "$($__sh_which wget 2>/dev/null || true)" ]
+then
+    x="$($__sh_which curl 2>/dev/null || true)"
     if [ -n "$x" ]
     then
         alias wget="$x --remote-name-all"
@@ -30,49 +81,29 @@ alias lll='/bin/ls -lh'
 alias lr='/bin/ls -lhR'
 alias lt='/bin/ls -lhtr'
 
-# some systems (mainly Linux distros, because of course they do) juggle the
-# locations of standard utilities between /bin and /usr/bin
-for DATE in /bin/date /usr/bin/date date
-do
-    if [ -f "$DATE" -a -x "$DATE" ]
-    then
-        break
-    fi
-done
-for GREP in /usr/bin/grep /bin/grep grep
-do
-    if [ -f "$GREP" -a -x "$GREP" ]
-    then
-        break
-    fi
-done
-for EGREP in /usr/bin/egrep /bin/egrep "$GREP -E"
-do
-    if [ -f "$EGREP" -a -x "$EGREP" ]
-    then
-        break
-    fi
-done
-for SED in /usr/bin/sed /bin/sed sed
-do
-    if [ -f "$SED" -a -x "$SED" ]
-    then
-        break
-    fi
-done
-for UNAME in /bin/uname /usr/bin/uname uname
+DATE="$($__sh_which date 2>/dev/null || true)"
+[ -n "$DATE" -a -f "$DATE" -a -x "$DATE" ] || DATE='date'
+
+GREP="$($__sh_which grep 2>/dev/null || true)"
+[ -n "$GREP" -a -f "$GREP" -a -x "$GREP" ] || GREP='grep'
+EGREP="$GREP -E"
+
+SED="$($__sh_which sed 2>/dev/null || true)"
+[ -n "$SED" -a -f "$SED" -a -x "$SED" ] || SED='sed'
+ESED="$SED -E"
+
+for UNAME in /usr/bin/uname /bin/uname $($__sh_which uname 2>/dev/null || true) uname
 do
     if [ -f "$UNAME" -a -x "$UNAME" ]
     then
+        alias uname="$UNAME"
         break
     fi
 done
-alias   egrep="$EGREP"
-export  DATE EGREP GREP SED UNAME
+
+ECP='/bin/cp -p'
 
 # platform specific switches and aliases
-ECP='/bin/cp -p'
-ESED="$SED -E"
 case "$($UNAME -s)" in
     Darwin)
         alias dscl='/usr/bin/dscl -raw .'
@@ -94,9 +125,14 @@ case "$($UNAME -s)" in
     Linux)
         alias llf='/bin/ls -lhZ'
         alias lll='/bin/ls -lh --lcontext'
-        ESED="$SED -r"
+        ;;
+    SunOS)
+        alias llf='/bin/ls -lhZ'
+        alias lll='/bin/ls -lhZ'
         ;;
 esac
-alias   ecp="$ECP"
-alias   esed="$ESED"
-export  ECP ESED
+export DATE ECP EGREP ESED GREP SED UNAME
+
+alias ecp="$ECP"
+alias egrep="$EGREP"
+alias esed="$ESED"

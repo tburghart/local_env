@@ -1,6 +1,6 @@
 #!/usr/bin/false This file is meant to be sourced
 # ========================================================================
-# Copyright (c) 2013-2016 T. R. Burghart.
+# Copyright (c) 2013-2018 T. R. Burghart.
 # 
 # Permission to use, copy, modify, and/or distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -15,8 +15,9 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 # ========================================================================
 #
-# set up interactive shell behavior
-# alias some common commands that are builtins in some shells
+# Set up interactive shell behavior.
+# Alias some common commands that are builtins in some shells.
+# When updating, it's worth also looking at <repo>/etc/sh.common
 #
 
 # what shell are we using?
@@ -25,6 +26,7 @@ if [ -n "$ZSH_VERSION" ]
 then
     [[ -o interactive ]] || return
     alias whereis='whence -a'
+	alias which='whence -p'
 
 elif [ -n "$BASH_VERSION" ]
 then
@@ -39,6 +41,6 @@ elif [ -n "$KSH_VERSION" ]
 then
     [[ -n "$PS1" || -n "$__sh_interactive" ]] || return
     alias whereis='whence -a'
-	alias which='whence'
+	alias which='whence -p'
 
 fi

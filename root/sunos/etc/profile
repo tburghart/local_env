@@ -15,58 +15,23 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 # ========================================================================
 #
-# System-wide profile for Bourne-ish shells on Linux.
+# System-wide profile for Bourne-ish shells on SunOS (Illumos).
 #
 # This needs to work for sh, bash, ksh, and zsh, though zsh handles sourcing
 # the shrc file on its own.
 #
 
-if [ -z "$EUID" ]
+PAGER='/usr/bin/less'
+if [ -z "$TERM" ]
 then
-    EUID="$(/usr/bin/id -u)"
-fi
-if [ -z "$UID" ]
-then
-    UID="$(/usr/bin/id -ru)"
-fi
-if [ -z "$LOGNAME" ]
-then
-    if [ -n "$USER" ]
-    then
-        LOGNAME="$USER"
-    else
-        LOGNAME="$(/usr/bin/id -un)"
-    fi
+    # maybe risky, but it's the default
+    TERM='sun-color'
 fi
 if [ -z "$USER" ]
 then
     USER="$LOGNAME"
 fi
-MAIL="/var/spool/mail/$(/usr/bin/id -un)"
-
-HOSTNAME="$(/usr/bin/hostname 2>/dev/null)"
-
-# pathmunge is an abomination, just be smart
-# system /sbin should ALWAYS come before local variants for the superuser, but
-# normal users may want local overrides first, which makes it easier anyway
-for __prf_d in /usr/local/sbin /sbin
-do
-    case "$PATH" in
-        *:$__prf_d:*|$__prf_d:*|*:$__prf_d)
-            ;;
-        *)
-            if [ "$EUID" = "0" ]
-            then
-                PATH="$__prf_d:$PATH"
-            else
-                PATH="$PATH:$__prf_d"
-            fi
-            ;;
-    esac
-done
-unset __prf_d
-
-export HOSTNAME LOGNAME MAIL PATH USER
+export LOGNAME PAGER PATH TERM USER
 
 # ========================================================================
 # Below here *should* be common accross platforms.

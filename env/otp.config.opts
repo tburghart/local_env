@@ -54,8 +54,15 @@ if [[ $otp_src_vsn_major -lt 19 && "$os_type" == 'darwin' ]]
 then
     otp_config_opts='--enable-darwin-64bit --with-cocoa'
     # addl_cc_flags+=' -D_DARWIN_FEATURE_CLOCK_GETTIME=0'
+elif [[ "$os_type" == 'sunos' ]]
+then
+    # autoconf may not figure out that we're on a 64-bit platform
+    n="$(uname -r)"
+    n="solaris$((${n%%.*} - 3)).${n#*.}"
+    otp_config_opts="--build=x86_64-pc-$n --enable-m64-build"
+    unset n
 else
-    otp_config_opts='--enable-64bit'
+    otp_config_opts='--enable-m64-build'
 fi
 
 openssl_local=''

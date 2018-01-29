@@ -161,6 +161,7 @@ do
             echo "==> $GIT push --quiet '$tmp' '$branch'"
             $GIT push --quiet "$tmp" "$branch"
         done
+        cd "$rdir"
         echo '==>' "$sdir/otp.apply.patches" "$work"
         if "$sdir/otp.apply.patches" "$work"
         then
@@ -168,11 +169,12 @@ do
             if "$sdir/otp.replace.as" "${replace_flags[@]}" "$work" "$otp"
             then
                 /bin/rm -rf /tmp/*."$ext"
-            else
-                /bin/mv *."$ext" /tmp
+            elif /bin/mv $work/*.$ext /tmp 2>/dev/null
+            then
                 echo "!!! error log(s) saved as /tmp/*.$ext"
             fi
         fi
+        cd "$work"
     fi
     [[ $vsn -gt $vsn_min ]] || break
     if [[ "$branch" == "maint-$vsn" ]] \
@@ -182,3 +184,4 @@ do
     fi
     branch="maint-$vsn"
 done
+cd "$rdir"

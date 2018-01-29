@@ -65,6 +65,9 @@ root_deprecated	:= $(wildcard \
 	/usr/local/etc/bash.term.prompt \
 	/usr/local/etc/zsh.term.prompt)
 
+SHELL	:= /bin/bash
+export	SHELL
+
 prjdir	:= $(CURDIR)
 uname	:= $(or $(wildcard /bin/uname), \
 		$(wildcard /usr/bin/uname), \
@@ -73,20 +76,41 @@ stype	:= $(or $(shell $(uname) -s 2>/dev/null \
 		| /usr/bin/tr '[A-Z]' '[a-z]' 2>/dev/null), \
 		$(error Can't determine system type))
 uid	:= $(or $(shell /usr/bin/id -u 2>/dev/null), \
-		$(error Can't figure out your UID))
+		$(error Can't figure out your User ID))
 gid	:= $(or $(shell /usr/bin/id -g 2>/dev/null), \
-		$(error Can't figure out your GID))
+		$(error Can't figure out your Group ID))
+unm	:= $(or $(shell /usr/bin/id -un 2>/dev/null), \
+		$(error Can't figure out your User Name))
+gnm	:= $(or $(shell /usr/bin/id -gn 2>/dev/null), \
+		$(error Can't figure out your Group Name))
+
+INSTALL	:= $(or $(wildcard /usr/gnu/bin/install), \
+		$(wildcard /usr/ucb/install), \
+		$(wildcard /usr/bin/install), \
+		$(error Can't find compatible install program))
 
 # whether to install files to /usr/local/bin
 lclinst	:= false
 
+ifeq	($(stype),sunos)
+sys_usr	:= root
+sys_grp	:= root
+else
+sys_usr	:= 0
+sys_grp	:= 0
+endif
+
 ifeq	($(stype),darwin)
-adm_gid	:= admin
+adm_grp	:= admin
+else
+adm_grp	:= $(sys_grp)
+endif
+
+ifeq	($(stype),darwin)
 ifneq	($(uid),0)
 lclinst	:= true
 endif
 else
-adm_gid	:= 0
 ifeq	($(uid),0)
 lclinst	:= true
 endif
@@ -111,11 +135,11 @@ else
 prof_d	:= false
 endif
 
-dl_cmd	:= $(shell which curl 2>/dev/null || true)
+dl_cmd	:= $(shell type -p curl 2>/dev/null || true)
 ifneq ($(wildcard $(dl_cmd)),)
 dl_cmd	+= -SsLRo
 else
-dl_cmd	:= $(shell which wget 2>/dev/null || true)
+dl_cmd	:= $(shell type -p wget 2>/dev/null || true)
 ifneq ($(wildcard $(dl_cmd)),)
 dl_cmd	+= -qNO
 else
@@ -124,12 +148,11 @@ $(warning Need curl or wget to download files)
 endif
 endif
 
-# counting on this unlinking the destination file before copying
-INSTALL	:= /usr/bin/install
+# counting on install unlinking the destination file before copying
 
-INSTADM	:= $(INSTALL) -o $(uid) -g $(adm_gid)
-INSTSYS	:= $(INSTALL) -o 0 -g 0
-INSTUSR	:= $(INSTALL) -o $(uid) -g $(gid)
+INSTADM	:= $(INSTALL) -o $(unm) -g $(adm_grp)
+INSTSYS	:= $(INSTALL) -o $(sys_usr) -g $(sys_grp)
+INSTUSR	:= $(INSTALL) -o $(unm) -g $(gnm)
 LNADM	:= /bin/ln -fs
 LNSYS	:= /bin/ln -fs
 LNUSR	:= /bin/ln -fs
@@ -139,7 +162,7 @@ INSTSYS	:= @echo $(INSTSYS)
 LNSYS	:= @echo $(LNSYS)
 endif
 
-ifneq	($(adm_gid),0)
+ifneq	($(adm_grp),$(adm_grp))
 INSTAF	:= $(INSTADM) -m 0664
 INSTAL	:= $(LNADM)
 INSTAX	:= $(INSTADM) -m 0775
@@ -261,9 +284,11 @@ endif
 	$(INSTSF) $< $@
 
 /usr/local/etc/% : $(prjdir)/root/$(stype)/usr/local/etc/%
+	@test -d $(@D) || /bin/mkdir -p $(@D)
 	$(INSTSF) $< $@
 
 /usr/local/etc/% : $(prjdir)/root/usr/local/etc/%
+	@test -d $(@D) || /bin/mkdir -p $(@D)
 	$(INSTSF) $< $@
 
 $(HOME)/.% : $(prjdir)/home/$(stype)/%
@@ -306,11 +331,12 @@ $(HOME)/.zshrc : $(HOME)/.shrc
 ifeq	($(dl_cmd),)
 $(warning Skipping download/check of $(dl_tgts))
 else
-escript	:= $(or $(shell which escript), \
-		$(lastword $(wildcard $(if \
-        $(LOCAL_OTP_DIR),$(LOCAL_OTP_DIR),/opt/erlang)/otp-??-ga/bin/escript)))
+escript	:= $(or $(shell type -P escript 2>/dev/null || true), \
+		$(lastword $(sort $(wildcard \
+        $(if $(LOCAL_OTP_DIR),$(LOCAL_OTP_DIR),/opt/erlang)/otp-??-ga/bin/escript))))
 
 /usr/local/bin/% : /tmp/ledl/%
+	@test -d $(@D) || /bin/mkdir -p $(@D)
 	$(INSTAX) -p $< $@
 
 /tmp/ledl/rmate :
@@ -330,11 +356,11 @@ escript	:= $(or $(shell which escript), \
 	@echo '    touch -t 201608311451.36 "$$1"' >>$@.sts
 	@echo '    exit $$?' >>$@.sts
 	@echo 'fi' >>$@.sts
-	@echo 'ts="$$("$$2" "$$1" -V | tr -d _ | \\' >>$@.sts
+	@echo 'ts="$$("$$2" "$$1" -V | tr -d _ | \' >>$@.sts
 	@echo "    awk '{print substr(\$$4,1,12) \".\" substr(\$$4,13,14)}')\"" >>$@.sts
 	@echo 'touch -t "$$ts" "$$1"' >>$@.sts
 	@chmod +x $@.sts
-	@$@.sts $@ "$(escript)"
+	$@.sts "$@" "$(escript)"
 
 /tmp/ledl/rebar3 :
 	@test -d $(@D) || /bin/mkdir -p $(@D)

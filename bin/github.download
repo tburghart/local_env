@@ -139,11 +139,31 @@ filter='/^[[:space:]]*"committer":[[:space:]]*\{/,/^[[:space:]]*"date":/'
 filter+=' s/^[[:space:]]*"date":[[:space:]]*"([0-9-]+)T([0-9:]+)Z".*$/\1 \2 GMT/p'
 gh_ts="$($ESED -n "$filter" "$io_dir/gh.meta" | head -1)"
 
-# BSD and GNU versions of 'date' use different options, try both
-utc_ts="$(date -jf '%Y-%m-%d %H:%M:%S %Z' "$gh_ts" '+%s' 2>/dev/null \
-        || date "--date=$gh_ts" '+%s')"
-touch_ts="$(date -jf '%s' "$utc_ts" '+%Y%m%d%H%M.%S' 2>/dev/null \
-        || date "--date=@$utc_ts" '+%Y%m%d%H%M.%S')"
+# BSD and GNU versions of 'date' use entirely different options - there's
+# no easily POSIX-compliant way to do what we want to do here ...
+date_tmp="$(mktemp /tmp/ghd.XXXXXXX)"
+trap "/bin/rm $date_tmp" EXIT
+
+unset touch_ts
+for d in /usr/gnu/bin/date /usr/bin/date date
+do
+    date="$(type -P $d || true)"
+    if [[ -n "$date" ]]
+    then
+        if "$date" "--date=$gh_ts" '+%Y%m%d%H%M.%S' 1>"$date_tmp" 2>/dev/null \
+        || "$date" -jf '%Y-%m-%d %H:%M:%S %Z' "$gh_ts" '+%Y%m%d%H%M.%S' \
+            1>"$date_tmp" 2>/dev/null
+        then
+            touch_ts="$(< "$date_tmp")"
+            break
+        fi
+    fi
+done
+if [[ -z "$touch_ts" ]]
+then
+    echo "$sname error: unable to translate file timestamp" >&2
+    exit 1
+fi
 
 download "$file_url" "$io_dir/gh.file"
 touch -t "$touch_ts" "$io_dir/gh.file"

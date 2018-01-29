@@ -104,8 +104,8 @@ case "$__shrc_sh" in
         set -o vi
         shopt -s histappend
         
-        alias whence='type -p'
-        alias which='type -p'
+        alias whence='type'
+        alias which='type -P'
         typeof()
         {
             if [[ $# -ne 1 ]]
@@ -126,7 +126,7 @@ case "$__shrc_sh" in
         # ksh specific
         set -o vi
         set -o vi-tabcomplete
-    	alias which='whence'
+    	alias which='whence -p'
         typeof()
         {
             if [[ $# -ne 1 ]]

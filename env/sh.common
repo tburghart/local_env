@@ -1,0 +1,92 @@
+#!/usr/bin/false This file is meant to be sourced
+# ========================================================================
+# Copyright (c) 2013-2018 T. R. Burghart.
+# 
+# Permission to use, copy, modify, and/or distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+# 
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+# ========================================================================
+#
+# Set up functions as needed for common shell builtin operations (aliases may
+# not work in scripts depending on platform and/or shell) for use in non-
+# interactive scripts.
+# When updating, it's worth also looking at <repo>/root/usr/local/etc/sh.rc
+#
+# Try to ensure that 'whence', 'whereis', and 'which':
+#   * Are valid command names.
+#   * Only write errors, if any, to stderr, not to stdout.
+#
+
+unset __sh_have_type __sh_have_whence
+
+# Order shell tests to check for those that may be emulating others before
+# checking for those that may be emulated by them.
+
+if [[ -n "$ZSH_VERSION" ]]
+then
+    __sh_have_whence=1
+
+elif [[ -n "$BASH_VERSION" ]]
+then
+    __sh_have_type=1
+
+elif [[ -n "$KSH_VERSION" ]]
+then
+    __sh_have_whence=1
+#
+# See if we're in a shell that has some common builtins ...
+# Use 'mkdir' as our test target, since it's almost certainly an actual
+# executable file on the $PATH.
+#
+elif whence -p mkdir 1>/dev/null 2>&1 \
+    && [[ "$(whence -p mkdir 2>/dev/null)" == */mkdir ]]
+then
+    __sh_have_whence=1
+
+elif type -P mkdir 1>/dev/null 2>&1 \
+    && [[ "$(type -P mkdir 2>/dev/null)" == */mkdir ]]
+then
+    __sh_have_type=1
+fi
+
+if [[ -n "$__sh_have_whence" ]]
+then
+    function whereis
+    {
+        whence -a "$@"
+    }
+	function which
+    {
+        whence -p "$@"
+    }
+elif [[ -n "$__sh_have_type" ]]
+then
+    function whence
+    {
+        type "$@"
+    }
+    function whereis
+    {
+        type -a "$@"
+    }
+    function which
+    {
+        type -P "$@"
+    }
+else
+    # Assume 'which' and 'whereis' exist.
+    function whence
+    {
+        which "$@"
+    }
+fi
+
+unset __sh_have_type __sh_have_whence

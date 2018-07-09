@@ -150,9 +150,9 @@ endif
 
 # counting on install unlinking the destination file before copying
 
-INSTADM	:= $(INSTALL) -o $(unm) -g $(adm_grp)
+INSTADM	:= $(INSTALL) -o $(uid) -g $(adm_grp)
 INSTSYS	:= $(INSTALL) -o $(sys_usr) -g $(sys_grp)
-INSTUSR	:= $(INSTALL) -o $(unm) -g $(gnm)
+INSTUSR	:= $(INSTALL) -o $(uid) -g $(gid)
 LNADM	:= /bin/ln -fs
 LNSYS	:= /bin/ln -fs
 LNUSR	:= /bin/ln -fs

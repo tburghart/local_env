@@ -252,9 +252,11 @@ _copyright_style()
     case "$1" in
         [cC]|*.c|*.h)
             echo c      ;;
-        [cC][cC]|[cC][pP][pP]|[jJ][aA][vV][aA]|*.cc|*.C|*.cpp|*.hh|*.H|*.hpp|*.java)
+        [cC][cC]|[cC][pP][pP]|*.cc|*.C|*.cpp|*.hh|*.H|*.hpp)
             echo cc     ;;
         [jJ][aA][vV][aA]|*.java)
+            echo cc     ;;
+        [sS][wW][iI][fF][tT]|*.swift)
             echo cc     ;;
         erl|*.erl|*.hrl)
             echo erl    ;;
@@ -832,12 +834,19 @@ alias dircp='/bin/pax -rw -pe -X'
 alias rtconf="m ~/.riak_test.config"
 alias shconf="m ~/.shrc"
 alias shrc=". ~/.shrc"
-alias th='export HISTFILE="$(/bin/ls -1 /tmp/tsh.??????? 2>/dev/null || /usr/bin/mktemp /tmp/tsh.XXXXXXX)"'
 alias e="$MATE"
 [[ -z "$BASHO_PRJ_BASE" ]] || alias b="cd $BASHO_PRJ_BASE"
 [[ -z "$WDAY_PRJ_BASE" ]] || alias d="cd $WDAY_PRJ_BASE"
 [[ -z "$TRB_PRJ_BASE" ]] || alias t="cd $TRB_PRJ_BASE"
 [[ -z "$R3R_PRJ_BASE" ]] || alias rr="cd $R3R_PRJ_BASE"
+
+th()
+{
+    export HISTFILE="$( \
+        /bin/ls -1 /tmp/tsh.???????? 2>/dev/null || \
+        /usr/bin/mktemp /tmp/tsh.XXXXXXXX )"
+    [[ ! -s "$HISTFILE" ]] || history -r "$HISTFILE"
+}
 
 # Idea IDE(s)
 __shrc_ideajdks="$(/bin/ls -1d \

@@ -1,0 +1,50 @@
+#!/bin/bash -e
+# ========================================================================
+# Copyright (c) 2017,2018 T. R. Burghart
+#
+# Permission to use, copy, modify, and/or distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+# ========================================================================
+#
+# Reset file permissions before adding with git, as Textmate sets anything
+# it sees as a shell script executable, and we have lots of them that are
+# only meant to be sourced.
+#
+
+readonly le_dir="$(cd "$(dirname "$0")" && pwd)"
+
+cd "$le_dir"
+
+declare -a fdirs
+for elem in *
+do
+    [[ -d "$elem" && "$elem" != '.git' && "$elem" != 'bin' ]] || continue
+    fdirs+=("$elem")
+done
+
+declare -a found=($(/usr/bin/find 'bin' "${fdirs[@]}" -type d ! -perm 0755))
+while [[ ${#found[@]} -gt 0 ]]
+do
+    /bin/chmod 0755 "${found[@]}"
+    found=($(/usr/bin/find 'bin' "${fdirs[@]}" -type d ! -perm 0755))
+done
+
+found=($(/usr/bin/find 'bin' -type f ! -perm 0755 ! -name '.tm_properties'))
+[[ ${#found[@]} -eq 0 ]] || /bin/chmod 0755 "${found[@]}"
+
+found=($(/usr/bin/find 'bin' "${fdirs[@]}" -type f -name '.tm_properties' ! -perm 0644))
+[[ ! -f '.tm_properties' ]] || found+=('.tm_properties')
+found+=('.gitignore' 'LICENSE' 'Makefile' 'README.md')
+/bin/chmod 0644 "${found[@]}"
+
+found=($(/usr/bin/find "${fdirs[@]}" -type f ! -perm 0644))
+[[ ${#found[@]} -eq 0 ]] || /bin/chmod 0644 "${found[@]}"

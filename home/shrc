@@ -1,6 +1,6 @@
 #!/usr/bin/false This file is meant to be sourced
 # ========================================================================
-# Copyright (c) 1994-2018 T. R. Burghart.
+# Copyright (c) 1994-2019 T. R. Burghart.
 # 
 # Permission to use, copy, modify, and/or distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -29,7 +29,7 @@
 #
 # file permissions: rwxr-xr-x
 #
-umask	022
+umask   022
 
 # what shell are we using?
 # start with shells that may be emulating others
@@ -126,7 +126,7 @@ case "$__shrc_sh" in
         # ksh specific
         set -o vi
         set -o vi-tabcomplete
-    	alias which='whence -p'
+        alias which='whence -p'
         typeof()
         {
             if [[ $# -ne 1 ]]
@@ -893,9 +893,12 @@ alias gr="$GIT remote"
 alias gs="$GIT status"
 alias gt="$GIT tag"
 
-if [[ -d '/Applications/SourceTree.app' ]]
+if [[ -f '/usr/local/bin/stree' ]]
 then
-    alias st='open -a SourceTree'
+    alias st='/usr/local/bin/stree'
+elif [[ -d '/Applications/SourceTree.app' ]]
+then
+    alias st='/usr/bin/open -a SourceTree'
 fi
 
 gscrub()

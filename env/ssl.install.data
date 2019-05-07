@@ -10,7 +10,7 @@ fi
 if [[ -z "$openssl_branches" ]]
 then
     openssl_branches+=' openssl-1.0=OpenSSL_1_0_2-stable'
-    openssl_branches+=' openssl-1.1=OpenSSL_1_1_0-stable'
+    openssl_branches+=' openssl-1.1=OpenSSL_1_1_1-stable'
     [[ " $env_reset_unset " == *\ openssl_branches\ * ]] || \
         env_reset_unset+=' openssl_branches'
 fi

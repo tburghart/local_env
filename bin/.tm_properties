@@ -1,7 +1,9 @@
 # project
 projectDirectory    = "$CWD"
 windowTitle         = "[local_env/bin]  $TM_FILENAME $windowTitleSCM"
+softTabs            = true
+tabSize             = 4
 
 # default file type
 [ attr.untitled ]
-fileType            = 'source.shell'
+fileType            = "source.shell"

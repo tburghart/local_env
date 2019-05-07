@@ -1,0 +1,19 @@
+#!/usr/bin/false This file is meant to be sourced
+
+if [[ -z "$wx_install_base" ]]
+then
+    wx_install_base='/opt/local'
+    [[ " $env_reset_unset " == *\ wx_install_base\ * ]] || \
+        env_reset_unset+=' wx_install_base'
+fi
+
+if [[ -z "$wxwidgets_branches" ]]
+then
+    # v2.8.12 (last release) isn't on a branch
+    # wxwidgets_branches+=' wxwidgets-2.8=WX_2_8_BRANCH'
+    wxwidgets_branches+=' wxwidgets-3.0=WX_3_0_BRANCH'
+    # wxwidgets_branches+=' wxwidgets-3.1=WX_3_1_BRANCH'
+    wxwidgets_branches+=' wxwidgets-3.1=master'
+    [[ " $env_reset_unset " == *\ wxwidgets_branches\ * ]] || \
+        env_reset_unset+=' wxwidgets_branches'
+fi

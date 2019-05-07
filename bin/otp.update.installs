@@ -1,6 +1,6 @@
 #!/bin/bash -e
 # ========================================================================
-# Copyright (c) 2015-2018 T. R. Burghart
+# Copyright (c) 2015-2019 T. R. Burghart
 #
 # Permission to use, copy, modify, and/or distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -19,6 +19,10 @@ readonly  rdir="$(pwd)"
 readonly  sdir="$(cd "$(dirname "$0")" && pwd)"
 readonly  sname="${0##*/}"
 readonly  spath="$sdir/$sname"
+
+declare  -r otp_source_repo='https://github.com/erlang/otp.git'
+declare  -r otp_dest_repos="${OTP_UPDATE_REPOS}"
+declare -i  otp_vsn_min="${OTP_UPDATE_MIN_VSN}"
 
 usage_exit()
 {
@@ -102,33 +106,38 @@ fi
 . "$LOCAL_ENV_DIR/os.type" || exit $?
 . "$LOCAL_ENV_DIR/otp.install.base" || exit $?
 
-readonly  source='https://github.com/erlang/otp.git'
-readonly  dests='https://github.com/tburghart/otp.git'
-
 readonly  work="$(mktemp -d /tmp/otp.XXXXXXX)"
 trap "/bin/rm -rf $work" EXIT
 
-typeset -ir vsn_min=17
 typeset -i  vsn
 typeset     ext log otp ref rel tmp
 typeset     branch='master'
 
-echo "==> $GIT clone --quiet '$source' '$work'"
-$GIT clone --quiet "$source" "$work"
+echo "==> $GIT clone --quiet '$otp_source_repo' '$work'"
+$GIT clone --quiet "$otp_source_repo" "$work"
 cd "$work"
 
 ref="$($GIT branch --list | sed -En \
     's/^[[:space:]]*\*[[:space:]]+([^[:space:]]+)[[:space:]]*$/\1/p')"
-if [[ "$ref" != "$branch" ]]
+if [[ "$ref" != "$branch" && -n "$otp_dest_repos" ]]
 then
-    for tmp in $dests
+    for tmp in $otp_dest_repos
     do
         echo "==> $GIT push --quiet '$tmp' '$ref'"
         $GIT push --quiet "$tmp" "$ref"
     done
 fi
 
-# work down from the version in $branch to $vsn_min
+# if not initialized, set otp_vsn_min to capture last 3 GAs
+if [[ -z "$otp_vsn_min" || $otp_vsn_min -eq 0 ]]
+then
+    tmp="$(<OTP_VERSION)"
+    vsn="${tmp%%.*}"
+    let 'otp_vsn_min = (vsn - 3)'
+fi
+readonly otp_vsn_min
+
+# work down from the version in $branch to $otp_vsn_min
 
 while true
 do
@@ -156,11 +165,14 @@ do
     then
         echo "Skipping '$otp_install_base/$otp' - up to date"
     else
-        for tmp in $dests
-        do
-            echo "==> $GIT push --quiet '$tmp' '$branch'"
-            $GIT push --quiet "$tmp" "$branch"
-        done
+        if [[ -n "$otp_dest_repos" ]]
+        then
+            for tmp in $otp_dest_repos
+            do
+                echo "==> $GIT push --quiet '$tmp' '$branch'"
+                $GIT push --quiet "$tmp" "$branch"
+            done
+        fi
         cd "$rdir"
         echo '==>' "$sdir/otp.apply.patches" "$work"
         if "$sdir/otp.apply.patches" "$work"
@@ -176,7 +188,7 @@ do
         fi
         cd "$work"
     fi
-    [[ $vsn -gt $vsn_min ]] || break
+    [[ $vsn -gt $otp_vsn_min ]] || break
     if [[ "$branch" == "maint-$vsn" ]] \
     || ! $GIT checkout --force --quiet "maint-$vsn" 2>/dev/null
     then

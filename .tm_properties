@@ -1,7 +1,11 @@
 # project
 projectDirectory    = "$CWD"
 windowTitle         = "[local_env]  $TM_FILENAME $windowTitleSCM"
+softTabs            = true
+tabSize             = 4
 
-# default file type
-[ attr.untitled ]
-fileType            = 'source.shell'
+# Makefile gets real tabs
+[ Makefile ]
+fileType            = "source.makefile"
+softTabs            = false
+tabSize             = 8

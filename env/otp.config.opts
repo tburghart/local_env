@@ -1,6 +1,6 @@
 #!/usr/bin/false This file is meant to be sourced
 # ========================================================================
-# Copyright (c) 2014-2018 T. R. Burghart.
+# Copyright (c) 2014-2019 T. R. Burghart.
 # 
 # Permission to use, copy, modify, and/or distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -42,7 +42,8 @@ for n in \
     os.type \
     otp.source.version \
     env.tool.defaults \
-    ssl.install.data
+    ssl.install.data \
+    wx.install.data
 do
     . "$LOCAL_ENV_DIR/$n"
 done
@@ -65,11 +66,22 @@ else
     otp_config_opts='--enable-m64-build'
 fi
 
-openssl_local=''
-[[ $otp_src_vsn_major -lt 20 ]] || \
-    openssl_local+=" /usr/local/openssl-1.1 $ssl_install_base/openssl-1.1"
-openssl_local+=" /usr/local/openssl-1.0 $ssl_install_base/openssl-1.0"
-openssl_local+=" /usr/local $ssl_install_base"
+declare -a openssl_local
+[[ $otp_src_vsn_major -lt 20 ]] || openssl_local+=( \
+    '/usr/local/openssl-1.1' "$ssl_install_base/openssl-1.1" )
+openssl_local+=( \
+    '/usr/local/openssl-1.0' "$ssl_install_base/openssl-1.0" \
+    '/usr/local' "$ssl_install_base" \
+)
+
+declare -a wxwidgets_local
+[[ $otp_src_vsn_major -lt 21 ]] || wxwidgets_local+=( \
+    '/usr/local/wxwidgets-3.1' "$wx_install_base/wxwidgets-3.1" )
+wxwidgets_local+=( \
+    '/usr/local/wxwidgets-3.0' "$wx_install_base/wxwidgets-3.0" \
+    '/usr/local/wxwidgets-2.8' "$wx_install_base/wxwidgets-2.8" \
+    '/usr/local' "$wx_install_base" \
+)
 
 openssl_sdks=''
 if [[ "$os_type" == 'darwin' ]]
@@ -79,7 +91,7 @@ then
 fi
 
 openssl_flags=''
-for openssl_base in $openssl_local
+for openssl_base in "${openssl_local[@]}"
 do
     if [[ -f "$openssl_base/include/openssl/crypto.h" ]]
     then
@@ -131,6 +143,18 @@ fi
 otp_config_opts+=" $openssl_flags"
 unset openssl_flags
 
+wxwidgets_flags=''
+for wxwidgets_base in "${wxwidgets_local[@]}"
+do
+    wxwidgets_config="$wxwidgets_base/bin/wx-config"
+    if [[ -f "$wxwidgets_config" && -x "$wxwidgets_config" ]]
+    then
+        wxwidgets_flags="--with-wx-config=$wxwidgets_config"
+        break
+    fi
+done
+unset wxwidgets_base wxwidgets_local wxwidgets_config
+
 otp_hipe_supported='false'
 case "$os_type" in
     'linux')
@@ -159,15 +183,20 @@ fi
 if [[ $otp_src_vsn_major -le 15 ]]
 then
     otp_config_opts+=' --without-wx'
-fi
-if [[ $otp_src_vsn_major -ge 17 ]]
+elif [[ -z "$wxwidgets_flags" ]]
 then
+    echo    'error: no wxConfig SDK found!' >&2
+    unset   wxwidgets_flags
+    return  2
+else
     otp_config_opts+=' --with-wx --without-gs'
+    otp_config_opts+=" $wxwidgets_flags"
 fi
 if [[ $otp_src_vsn_major -lt 18 ]]
 then
     addl_cc_flags+=' -w'
 fi
+unset wxwidgets_flags
 
 CFLAGS+="$addl_cc_flags"
 CXXFLAGS+="$addl_cc_flags"

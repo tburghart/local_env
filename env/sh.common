@@ -63,7 +63,7 @@ then
     {
         whence -a "$@"
     }
-	function which
+    function which
     {
         whence -p "$@"
     }

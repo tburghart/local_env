@@ -77,8 +77,9 @@ openssl_local+=( \
 declare -a wxwidgets_local
 [[ $otp_src_vsn_major -lt 21 ]] || wxwidgets_local+=( \
     '/usr/local/wxwidgets-3.1' "$wx_install_base/wxwidgets-3.1" )
+[[ $otp_src_vsn_major -lt 15 ]] || wxwidgets_local+=( \
+    '/usr/local/wxwidgets-3.0' "$wx_install_base/wxwidgets-3.0" )
 wxwidgets_local+=( \
-    '/usr/local/wxwidgets-3.0' "$wx_install_base/wxwidgets-3.0" \
     '/usr/local/wxwidgets-2.8' "$wx_install_base/wxwidgets-2.8" \
     '/usr/local' "$wx_install_base" \
 )
@@ -189,7 +190,7 @@ then
     unset   wxwidgets_flags
     return  2
 else
-    otp_config_opts+=' --with-wx --without-gs'
+    otp_config_opts+=' --with-wx'
     otp_config_opts+=" $wxwidgets_flags"
 fi
 if [[ $otp_src_vsn_major -lt 18 ]]

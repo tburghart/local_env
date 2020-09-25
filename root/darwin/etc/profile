@@ -1,6 +1,6 @@
 #!/usr/bin/false This file is meant to be sourced
 # ========================================================================
-# Copyright (c) 1994-2018 T. R. Burghart.
+# Copyright (c) 1994-2020 T. R. Burghart.
 # 
 # Permission to use, copy, modify, and/or distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -147,6 +147,9 @@ HISTFILESIZE=2048
 HISTSIZE=1024
 SAVEHIST="$HISTFILESIZE"
 export HISTCONTROL HISTFILE HISTFILESIZE HISTSIZE SAVEHIST
+
+# shut up Catalina's startup notice
+export BASH_SILENCE_DEPRECATION_WARNING=1
 
 if [ -n "$__sh_interactive" ]
 then

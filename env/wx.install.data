@@ -15,6 +15,7 @@ then
     wxwidgets_versions+=' wxwidgets-2.8=WX_2_8_BRANCH'
     wxwidgets_versions+=' wxwidgets-3.0=WX_3_0_BRANCH'
     # wxwidgets_versions+=' wxwidgets-3.1=WX_3_1_BRANCH'
+    # wxwidgets_versions+=' wxwidgets-3.1=v3.1.3'
     # 'master' has unresolved autoconf problems on macOS
     # wxwidgets_versions+=' wxwidgets-3.1=master'
     [[ " $env_reset_unset " == *\ wxwidgets_versions\ * ]] || \

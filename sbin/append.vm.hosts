@@ -1,0 +1,48 @@
+#!/bin/bash
+# ========================================================================
+# Copyright (c) 2020 T. R. Burghart
+#
+# Permission to use, copy, modify, and/or distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+# ========================================================================
+
+if [[ $# -ne 2 ]] || ! [[ -f "$1" ]] || \
+    ! [[ "$2" =~ [1-9][0-9]?[0-9]?\.[1-9][0-9]?[0-9]?\.[1-9][0-9]?[0-9]? ]]
+then
+    echo "Usage: ${0##*/} <hosts-file> N.N.N (network)" >&2
+    exit 1
+fi
+
+readonly tgt="$1"
+readonly net="$2"
+readonly wid=$((14 - ${#net}))
+readonly pat="${net}.%-${wid}s"
+
+printf '##\n# Local Virtual Machines\n##\n' >>"$tgt"
+
+printf "$pat vmhost\n" 1 >>"$tgt"
+printf "$pat vmgw\n" 2 >>"$tgt"
+printf "$pat vmcast\n" 255 >>"$tgt"
+
+declare -i n=3
+
+while [[ $n -lt 100 ]]
+do
+    printf "$pat vm%03u   vm%u\n" $n $n $n
+    n+=1
+done >>"$tgt"
+while [[ $n -lt 255 ]]
+do
+    printf "$pat vm%03u\n" $n $n
+    n+=1
+done >>"$tgt"
+

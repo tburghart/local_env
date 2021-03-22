@@ -223,13 +223,16 @@ r_tgts	+= $(foreach fn, zprofile bashrc zshrc, /etc/$(fn))
 h_tgts  := $(sort $(h_tgts))
 r_tgts  := $(sort $(r_tgts))
 
-.PHONY: default home root vars
+.PHONY: default home root touch vars
 
 ifeq	($(no_home),)
 default :: home
 endif
 
 default :: root
+
+touch ::
+	@find $(prjdir)/root $(prjdir)/home -type f -exec touch {} \;
 
 # for debugging
 vars ::

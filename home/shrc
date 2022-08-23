@@ -652,13 +652,24 @@ lenv()
             reset_lenv()
             {
                 [[ "$(typeof kerl_deactivate)" == 'undefined' ]] || kerl_deactivate
+                [[ "$(typeof otp_deactivate)" == 'undefined' ]] || otp_deactivate
 
-                if [[ -n "$env_reset_path" ]]
+                if [[ -n "$env_reset_path" && "$PATH" != "$env_reset_path" ]]
                 then
                     PATH="$env_reset_path"
                     unset env_reset_path
                     export PATH
                     hash -r
+                fi
+                if [[ -n "$env_reset_hist" && "$HISTFILE" != "$env_reset_hist" ]]
+                then
+                    history -w
+                    unset HISTFILE
+                    history -c
+                    HISTFILE="$env_reset_hist"
+                    unset env_reset_hist
+                    export HISTFILE
+                    history -r
                 fi
                 if [[ -n "$env_reset_unalias" ]]
                 then

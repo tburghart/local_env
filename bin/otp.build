@@ -1,0 +1,502 @@
+#!/bin/bash -e
+# ========================================================================
+# Copyright (c) 2014-2023 T. R. Burghart.
+# 
+# Permission to use, copy, modify, and/or distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+# 
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+# ========================================================================
+#
+# Builds a relocatable OTP release optimized for the machine building it.
+#
+# * The latest suitable OpenSSL crypto library is statically linked.
+#
+# * Option: wxWidgets-dependent applications can be included, requiring
+#   a local installation of the wxWidgets libraries.
+#
+# * Option: HTML documentation can be generated, with an encompassing index.
+#
+# * Option: OpenSSL, OTP, and Rebar3 tests can be run.
+#
+# !!! This script outputs a LOT of text,
+# !!! redirecting to a log file is strongly recommended.
+#
+# Usage: otp.build [options] <otp-release>
+#
+# Where:
+#
+#   <otp-release> is a positive integer
+#
+# Options:
+#
+#   -d  generate documentation
+#   -k  keep the build working directory
+#   -o  directory in which to create artifacts, default $PWD
+#   -p  portable, do not optimize for the specific machine CPU
+#   -t  run OpenSSL, OTP, and Rebar3 tests
+#   -w  with wxWdgets and dependant apps, default off
+#
+# Artifacts are overwritten without warning!
+#
+#   directory otp-<otp-release>
+#   archive otp-<otp-release>.tgz
+#   test archives otp-<otp-release>-*-tests.tgz
+#
+
+readonly pwd="$(pwd)"
+readonly scr="${0##*/}"
+
+dest_dir="$pwd"
+keep_bld='false'
+portable='false'
+run_tests='false'
+with_docs='false'
+with_wx='false'
+
+usage()
+{
+    echo "Usage: $scr [-dpw] [-c <cache-dir>] [-o <otp-base-dir>] <otp-release>" >&2
+    echo 'Where:' >&2
+    echo '  <otp-release> is a positive integer' >&2
+    echo 'Options:' >&2
+    echo '  -d  generate documentation' >&2
+    echo '  -k  keep the build working directory' >&2
+    echo '  -o  directory in which to create artifacts, default $PWD' >&2
+    echo '  -p  portable, do not optimize for the specific machine CPU' >&2
+    echo '  -t  run OpenSSL, OTP, and Rebar3 tests' >&2
+    echo '  -w  with wxWdgets and dependant apps, default off' >&2
+    exit 1
+}
+
+while getopts ':dko:ptw' flag
+do
+    case "$flag" in
+        d)
+            with_docs='true'
+            ;;
+        k)
+            keep_bld='true'
+            ;;
+        o)
+            if ! [[ -n "$OPTARG" && -d "$OPTARG" ]]
+            then
+                echo "${scr}: invalid destination directory: '${OPTARG}'" >&2
+                exit 2
+            fi
+            dest_dir="$(cd "$OPTARG" && pwd)"
+            ;;
+        p)
+            portable='true'
+            ;;
+        t)
+            run_tests='true'
+            ;;
+        w)
+            with_wx='true'
+            ;;
+        '?')
+            [[ "$OPTARG" == h || "$OPTARG" == - ]] || \
+            echo "${scr}: illegal option '${OPTARG}'" >&2
+            usage
+            ;;
+    esac
+done
+shift $(($OPTIND - 1))
+
+case $# in
+    0)
+        echo "${scr}: Missing required OTP release" >&2
+        usage
+        ;;
+    1)
+        if [[ "$1" =~ ^[1-9][0-9]*$ ]]
+        then
+            declare -i otp_rel="$1"
+        else
+            echo "${scr}: Non-integral OTP release '$1'" >&2
+            usage
+        fi
+        ;;
+    *)
+        echo "${scr}: Invalid command parameters" >&2
+        usage
+        ;;
+esac
+
+if [[ $otp_rel -lt 21 ]]
+then
+    echo "${scr}: Unsupported OTP release '$1'" >&2
+    exit 1
+elif [[ $otp_rel -gt 29 ]]
+then
+    echo "${scr}: Script update required for OTP release '$1'" >&2
+    exit 1
+fi
+
+if $with_docs
+then
+    if [[ -z "$JAVA_HOME" ]]
+    then
+        echo "${scr}: \$JAVA_HOME must be set to generate documentation" >&2
+        exit 5
+    elif [[ ! -d "$JAVA_HOME" ]]
+    then
+        echo "${scr}: Invalid \$JAVA_HOME: '${JAVA_HOME}'" >&2
+        exit 5
+    fi
+fi
+
+if $with_wx && ! type -P wx-config &>/dev/null
+then
+    echo "${scr}: wx-config not found on \$PATH" >&2
+    exit 5
+fi
+
+if [[ $otp_rel -lt 25 ]]
+then
+    declare -i ssl_rel=1
+    ssl_branch='OpenSSL_1_1_1-stable'
+else
+    declare -i ssl_rel=3
+    ssl_branch='openssl-3.1'
+fi
+
+os_name="$(uname -s)"
+os_vers="$(uname -r)"
+os_arch="$(uname -m)"
+git_exe="$(type -P git)"
+
+run()
+{
+    echo '==>' "$@" >&2
+    "$@"
+}
+
+git()
+{
+    run "$git_exe" "$@"
+}
+
+repos="/tmp/${scr}.$(/bin/date '+%Y%m%d.%H%M%S')"
+[[ -d "$repos" ]] || run /bin/mkdir "$repos"
+
+otp_dir="$dest_dir/otp-$otp_rel"
+
+echo
+echo "Working directory '${repos}'"
+if $keep_bld
+then
+    echo 'This directory will be left intact'
+else
+    echo 'On failure this directory will be left intact'
+fi
+echo
+echo "Target OTP Release:     $otp_rel"
+echo "Platform:               $os_name $os_vers $os_arch"
+echo "Destination Directory:  $otp_dir"
+echo "With Documentation:     $with_docs"
+echo "With wxWidgets:         $with_wx"
+echo
+
+# huge repo, and we don't need to search for a tag, so just take the tip of the branch
+git clone --quiet --branch "maint-$otp_rel" --single-branch --depth 1 'http://github.com/erlang/otp.git' "$repos/otp"
+
+# we'll be searching for the last release tag, so don't restrict depth
+git clone --quiet 'http://github.com/erlang/rebar3.git' "$repos/rebar3"
+git clone --quiet --branch "$ssl_branch" --single-branch 'http://github.com/openssl/openssl.git' "$repos/openssl"
+
+#
+# OTP maint-xx branch should always be at a release tag.
+# Rebar3 tags don't contain '-', so we can easily find the last tagged release.
+# OpenSSL tag patterns depend on version, takes a bit more work.
+#
+otp_vsn=$(< "$repos/otp/OTP_VERSION")
+
+rebar_vsn=$("$git_exe" -C "$repos/rebar3" describe | cut -d- -f1)
+git -C "$repos/rebar3" checkout --quiet "$rebar_vsn"
+
+if [[ $ssl_rel -lt 2 ]]
+then
+    ssl_vsn=$("$git_exe" -C "$repos/openssl" describe | cut -d- -f1)
+    git -C "$repos/openssl" checkout --quiet "$ssl_vsn"
+    ssl_vsn=${ssl_vsn#OpenSSL_}
+    ssl_vsn=${ssl_vsn//_/.}
+else
+    ssl_vsn=$("$git_exe" -C "$repos/openssl" describe | cut -d- -f1,2)
+    git -C "$repos/openssl" checkout --quiet "$ssl_vsn"
+    ssl_vsn=${ssl_vsn#openssl-}
+fi
+
+#
+# Figure out which app/switches to include/exclude
+#
+declare -a otp_apps
+
+otp_apps+=( '--without-javac' )
+otp_apps+=( '--without-jinterface' )
+otp_apps+=( '--without-megaco' )
+otp_apps+=( '--without-odbc' )
+
+if [[ -d "$repos/otp/lib/hipe" ]]
+then
+    otp_apps+=( '--disable-hipe' '--without-hipe' )
+fi
+
+# smoke tests use SNMP
+if ! $run_tests
+then
+    # if otp_mibs is present then os_mon requires it and hence snmp
+    if [[ ! -d "$repos/otp/lib/otp_mibs" ]]
+    then
+        otp_apps+=( '--without-snmp' )
+    fi
+fi
+
+if ! $with_wx
+then
+    otp_apps+=( '--without-wx' )
+    otp_apps+=( '--without-debugger' )
+    otp_apps+=( '--without-et' )
+    otp_apps+=( '--without-observer' )
+fi
+
+echo
+echo 'Building:'
+echo "  OTP version:      $otp_vsn"
+echo "  OpenSSL version:  $ssl_vsn"
+echo "  Rebar version:    $rebar_vsn"
+echo
+
+#
+# Purify the environment
+#
+unset   AR ARFLAGS AS ASFLAGS CC CFLAGS CXX CXXFLAGS CPP CPPFLAGS \
+        CPPDEFINES CPPINCLUDES LD LDFLAGS LDLIBS MAKE MAKEFLAGS RANLIB RM
+LANG=C
+TERM=dumb
+REBAR_COLOR=none
+export  LANG TERM REBAR_COLOR
+
+case "$os_name" in
+    Darwin)
+        CC='/usr/bin/cc'
+        CXX='/usr/bin/c++'
+        cpx='cp -pX'
+        open_html='run open'
+        os_cflags="-mmacosx-version-min=$(
+            sw_vers -productVersion | cut -d. -f1).0"
+        os_makeflags="-j$(($(sysctl -n hw.ncpu) / 2))"
+        ;;
+    Linux)
+        CC='/usr/bin/cc'
+        CXX='/usr/bin/c++'
+        cpx='cp -p'
+        open_html='true'
+        os_cflags=''
+        os_makeflags="-j$(($(nproc) - 1))"
+        ;;
+    *)
+        CC='/usr/bin/cc'
+        CXX='/usr/bin/c++'
+        cpx='cp -p'
+        open_html='true'
+        os_cflags=''
+        os_makeflags="-j$(($(sysctl -n hw.ncpu) - 1))"
+        ;;
+esac
+export  CC CXX
+
+#
+# OpenSSL
+#
+run cd "$repos/openssl"
+
+ssl_inst="$repos/openssl-inst"
+
+export  KERNEL_BITS=64
+case $ssl_rel in
+    1)
+        run ./config "--prefix=$ssl_inst" "--openssldir=$ssl_inst/ssl" \
+            --release $os_cflags shared enable-ec_nistp_64_gcc_128
+        ;;
+    3)
+        run ./Configure "--prefix=$ssl_inst" "--openssldir=$ssl_inst/ssl" \
+            --release $os_cflags no-makedepend no-module no-shared \
+            enable-ec_nistp_64_gcc_128
+        ;;
+    *)
+        echo "${scr}: Unsupported OpenSSL release '${ssl_rel}'" >&2
+        exit 5
+        ;;
+esac
+
+run make
+if $run_tests ; then run make test ; fi
+run make install_sw
+unset   KERNEL_BITS
+
+#
+# Erlang/OTP
+#
+run cd "$repos/otp"
+
+declare -a otp_opts
+otp_opts+=( '--enable-m64-build' )
+otp_opts+=( "--with-ssl=$ssl_inst" )
+otp_opts+=( '--disable-dynamic-ssl-lib' )
+otp_opts+=( "${otp_apps[@]}" )
+
+CFLAGS="-O3 -g0 -w $os_cflags"
+$portable || CFLAGS+=" -march=native -mtune=native"
+CXXFLAGS="$CFLAGS"
+LDFLAGS="-O3 -g0 $os_cflags"
+ERL_TOP="$repos/otp"
+MAKE="$(type -P make)"
+[[ "$($MAKE --version 2>/dev/null | head -1)" == GNU\ [Mm]ake\ * ]] \
+    || MAKE="$(type -P gmake || echo gmake)"
+MAKEFLAGS="$os_makeflags"
+
+export  CFLAGS CXXFLAGS LDFLAGS ERL_TOP MAKE MAKEFLAGS
+
+[[ ! -d "$otp_dir" ]] || run /bin/rm -rf "$otp_dir"
+
+run ./otp_build setup -a "--prefix=$otp_dir" "${otp_opts[@]}"
+run $MAKE install
+if $with_docs
+then
+    export  FOP_OPTS='-Xmx1024m'
+    # docs may fail if not building with wx
+    if run $MAKE docs install-docs DOC_TARGETS=html
+    then
+        run ln -s lib/erlang/doc/index.html "$otp_dir/index.html"
+        $open_html "$otp_dir/index.html" || true
+    fi
+fi
+
+#
+# Rebar
+#
+run cd "$repos/rebar3"
+
+path="$PATH"
+export  PATH="$ERL_TOP/bin:$path"
+hash -r 2>/dev/null || true
+run ./bootstrap
+export  PATH="$path"
+hash -r 2>/dev/null || true
+unset   path
+
+#
+# Complete the install and archive it
+# 
+run cd "$otp_dir"
+
+# get the list of OTP executables *before* installing rebar
+otp_exes=($(/bin/ls bin))
+
+run install -m 0755 "$repos/rebar3/rebar3" bin
+run install -m 0644 "$repos/otp/OTP_VERSION" .
+
+cat <<EOF > manifest.mf
+Erlang/OTP: $otp_vsn
+OpenSSL: $ssl_vsn
+Rebar: $rebar_vsn
+EOF
+chmod 0644 manifest.mf
+
+cat <<EOF > relocate_here
+#!/bin/bash -e
+
+otp_dir="\$(cd "\$(dirname "\$0")" && pwd)"
+"\$otp_dir/lib/erlang/Install" -minimal "\$otp_dir/lib/erlang" >/dev/null
+
+bin_dir="\$otp_dir/bin"
+cd "\$bin_dir"
+
+for x in ${otp_exes[@]}
+do
+    /bin/ln -sf "../lib/erlang/bin/\$x" .
+done
+
+# Make sure it works
+./erl -noshell -eval 'erlang:halt(0).'
+EOF
+chmod 0755 relocate_here
+
+cat <<EOF > activate
+#!/usr/bin/false
+
+_activate_dir="\$(cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)"
+
+otp_deactivate 2>/dev/null || true
+[[ -z "\$_ACTIVE_OTP_PATH" ]] || PATH="\${PATH//\${_ACTIVE_OTP_PATH}:/}"
+_ACTIVE_OTP_PATH="\$_activate_dir/bin"
+PATH="\${_ACTIVE_OTP_PATH}:\${PATH//\${_ACTIVE_OTP_PATH}:/}"
+export  PATH _ACTIVE_OTP_PATH
+
+otp_deactivate()
+{
+    if [[ -n "\$_ACTIVE_OTP_PATH" ]]
+    then
+        export  PATH="\${PATH//\${_ACTIVE_OTP_PATH}:/}"
+        unset   _ACTIVE_OTP_PATH
+        hash -r 2>/dev/null || true
+    fi
+    unset -f otp_deactivate
+}
+
+unset   _activate_dir
+hash -r 2>/dev/null || true
+EOF
+chmod 0644 activate
+
+run cd ..
+run tar czf "${otp_dir}.tgz" "otp-${otp_rel}"
+
+#
+# Now we can test OTP and Rebar
+#
+if $run_tests
+then
+    run cd "$ERL_TOP"
+
+    path="$PATH"
+    export  PATH="$ERL_TOP/bin:$path"
+    hash -r 2>/dev/null || true
+    run $MAKE release_tests
+    run cd release/tests/test_server
+    run "$ERL_TOP/bin/erl" -s ts install -s ts smoke_test batch -s init stop
+    export  PATH="$path"
+    hash -r 2>/dev/null || true
+    unset   path
+
+    chmod -R +r .
+    run tar czf "${otp_dir}-smoke-tests.tgz" .
+    $open_html index.html
+
+    run cd "$repos/rebar3"
+    . "$otp_dir/activate"
+
+    REBAR3="$otp_dir/bin/rebar3"
+    REBAR="$REBAR3"
+    export  REBAR REBAR3
+
+    run "$REBAR3" ct
+    run cd _build/test/logs
+    run tar czf "${otp_dir}-rebar-tests.tgz" .
+    $open_html index.html
+fi
+
+cd "$pwd"
+$keep_bld || run /bin/rm -rf "$repos"
+echo
+echo done.
+echo

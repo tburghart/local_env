@@ -1,0 +1,230 @@
+#!/usr/bin/false 'This file is meant to be sourced'
+# shellcheck disable=SC2096 # shebangs can only specify a single parameter
+[[ -z "$__sh_lenv_sourced" ]] || return 0
+# ========================================================================
+# Copyright (c) 1994-2024 T. R. Burghart.
+#
+# Permission to use, copy, modify, and/or distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+# ========================================================================
+#
+# .profile/.shrc fragment for Bourne-ish shells
+#
+# Sets up local environment swapping.
+#
+# Assumptions about the shell per ./sh.shell
+#
+# Refer to https://github.com/tburghart/local_env
+#
+# Install to $HOME/etc/shell/sh.lenv
+#
+[[ -n "$__sh_interactive_sourced" ]] || . "$HOME/etc/shell/sh.interactive"
+
+[[ -n "$lenv_file" ]] || lenv_file='env'
+
+# Change to Directory and Load local environment
+cdl()
+{
+    cd "$@" || return $?
+    lenv
+}
+
+if [[ -n "$LOCAL_ENV_DIR" && -d "$LOCAL_ENV_DIR/.." ]]
+then
+    # shellcheck disable=SC2139
+    alias le="cd ${LOCAL_ENV_DIR%/*}"
+fi
+
+# wtf is this even for???
+lel()
+{
+    if [[ -n "$env_reset_unset" ]]
+    then
+        # shellcheck disable=SC2046
+        env | $EGREP "^($(echo $(printf '%s\n' $env_reset_unset \
+            | $EGREP '^[[:upper:]]' | sort -u) | tr ' ' '|'))" | sort
+    fi
+}
+
+# Find Here Or Above
+fhoa()
+{
+    if [[ $# -lt 1 ]]
+    then
+        echo 'usage: fhoa <name> [<highest-dir>]' >&2
+        return 1
+    fi
+    if [[ -e "$1" ]]
+    then
+        echo "$(pwd)/$1"
+        return 0
+    fi
+    if [[ -n "$2" ]]
+    then
+        if [[ ! -d "$2" ]]
+        then
+            echo "error: fhoa: '$2' is not a directory"
+            return 1
+        fi
+        t="$(cd "$2" && pwd)"
+    else
+        t="$HOME"
+    fi
+    c="$(pwd)"
+    if [[ "$c" != "$t" && "${c#${t}/}" = "$c" ]]
+    then
+        unset c t
+        return 2
+    fi
+    while true
+    do
+        if [[ -e "$c/$1" ]]
+        then
+            echo "$c/$1"
+            unset c t
+            return 0
+        fi
+        if [[ "$c" = "$t" ]]
+        then
+            break
+        fi
+        c="${c%/*}"
+    done
+    unset c t
+    return 2
+}
+
+# Local Environment Name
+lenm()
+{
+    if [[ -n "$lenv_label" ]]
+    then
+        echo $lenv_label
+    elif [[ -n "$lenv_current" ]]
+    then
+        basename "$lenv_current"
+    fi
+}
+
+# Load local Environment
+lenv()
+{
+    lenv_target="$(fhoa $lenv_file 2>/dev/null || true)"
+    _reset_lenv
+    if [[ -n "$lenv_aliases" ]]
+    then
+        unalias $lenv_aliases 2>/dev/null
+        unset lenv_aliases
+    fi
+    [[ -z "$lenv_envvars" ]] || unset $lenv_envvars lenv_envvars
+    # shellcheck disable=SC2154
+    env_ss_format="$env_ss_format_default"
+
+    if [[ -f "$lenv_target" ]]
+    then
+        lenv_current="${lenv_target%/*}"
+        # shellcheck disable=SC1090
+        . "$lenv_target"
+        lenv_result=$?
+        # shellcheck disable=SC2046,SC2154
+        unset $env_local_unset env_local_unset \
+            $(set | $ESED -n 's/^(local_[[:alnum:]_]+)=.*$/\1/p' | tr '\n' ' ') \
+            2>/dev/null
+        [[ $lenv_result -eq 0 ]] || _reset_lenv
+        # If the script set a reset function be sure to invoke it on failure.
+        # We'll still follow up with a default version just to be sure
+        # everything's cleaned up.
+        if [[ "$(typeof reset_lenv)" == undefined && -z "$reset_lenv" ]]
+        then
+            reset_lenv()
+            {
+                [[ "$(typeof kerl_deactivate)" == 'undefined' ]] || kerl_deactivate
+
+                if [[ -n "$env_reset_path" ]]
+                then
+                    PATH="$env_reset_path"
+                    unset env_reset_path
+                    export PATH
+                    hash -r
+                fi
+                if [[ -n "$env_reset_unalias" ]]
+                then
+                    unalias $env_reset_unalias 2>/dev/null
+                    unset env_reset_unalias
+                fi
+                if [[ -n "$env_reset_unsetf" ]]
+                then
+                    unset -f $env_reset_unsetf 2>/dev/null
+                    unset env_reset_unsetf
+                fi
+                [[ -z "$env_reset_unset" ]] || unset $env_reset_unset env_reset_unset
+
+                # shellcheck disable=SC2034
+                env_ss_format="$env_ss_format_default"
+                unset -f reset_lenv
+            }
+        fi
+        if [[ $lenv_result -ne 0 ]]
+        then
+            _reset_lenv
+        else
+            switch_history "$lenv_current/.sh_history"
+            echo loaded environment from "'$lenv_current'"
+        fi
+        unset lenv_result
+    else
+        [[ -z "$lenv_current" ]] || unset lenv_current
+    fi
+    unset lenv_target
+}
+
+_lenv_help()
+{
+    env_ss_head 'Local Environment'
+    env_ss_show cdl             'Change to Directory and Load local environment'
+    env_ss_show fhoa            'Find Here Or Above'
+    env_ss_show le              'Change to the Local Environment source directory'
+    env_ss_show lel             'List variables to be unset ???'
+    env_ss_show lenm            'Local Environment Name'
+    env_ss_show lenv            'Load local Environment'
+    env_ss_show reset_lenv      'Reset current custom environment'
+}
+__sh_ss_funs+=' _lenv_help'
+
+_reset_lenv()
+{
+    case "$(typeof reset_lenv)" in
+        undefined )
+            if [[ -n "$reset_lenv" ]]
+            then
+                $reset_lenv
+                unset reset_lenv
+            fi
+            ;;
+        file )
+            . reset_lenv
+            ;;
+        alias )
+            reset_lenv
+            unalias reset_lenv 2>/dev/null || true
+            ;;
+        function )
+            reset_lenv
+            unset -f reset_lenv 2>/dev/null || true
+            ;;
+        * )
+            reset_lenv
+            ;;
+    esac
+    unset lenv_current 2>/dev/null || true
+    switch_history "$HOME/.sh_history"
+}

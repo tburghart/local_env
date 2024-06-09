@@ -1,0 +1,189 @@
+#!/usr/bin/false 'This file is meant to be sourced'
+# shellcheck disable=SC2096 # shebangs can only specify a single parameter
+[[ -z "$__sh_git_sourced" ]] || return 0
+# ========================================================================
+# Copyright (c) 1994-2024 T. R. Burghart.
+#
+# Permission to use, copy, modify, and/or distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+# ========================================================================
+#
+# .profile/.shrc fragment for Bourne-ish shells
+#
+# Sets up git-related commands.
+#
+# Assumptions about the shell per ./sh.shell
+#
+# Refer to https://github.com/tburghart/local_env
+#
+# Install to $HOME/etc/shell/sh.git
+#
+[[ -n "$__sh_interactive_sourced" ]] || . "$HOME/etc/shell/sh.interactive"
+
+alias g="$GIT"
+alias ga="$GIT add"
+alias gaa="$GIT add -A"
+alias gb="$GIT branch"
+alias gci="$GIT commit"
+alias gcl="$GIT clone"
+alias gco="$GIT checkout"
+alias gd="$GIT diff"
+alias gds="$GIT describe"
+alias gigg="m $HOME/.gitignore_global"
+alias gl="$GIT log"
+alias glr="$GIT log -n 2"
+alias gpull="$GIT pull"
+alias gpush="$GIT push"
+alias gr="$GIT remote"
+alias gs="$GIT status"
+alias gt="$GIT tag"
+
+if [[ -f '/usr/local/bin/stree' ]]
+then
+    alias st='/usr/local/bin/stree'
+elif [[ -d '/Applications/SourceTree.app' ]]
+then
+    alias st='/usr/bin/open -a SourceTree'
+fi
+
+giga()
+{
+    d="$(pwd)"
+    if [[ "$d" = "$HOME" ]]
+    then
+        "$MATE" ~/.gitignore_global
+    else
+        if [[ "$d" != "${d#${HOME}/}" ]]
+        then
+            while [[ "$d" != "$HOME" ]]
+            do
+                if [[ -f "$d/.gitignore" ]]
+                then
+                    "$MATE" -m "$(basename "$d") .gitignore" "$d/.gitignore"
+                    unset d
+                    return 0
+                fi
+                d="${d%/*}"
+            done
+            "$MATE" ~/.gitignore_global
+        fi
+    fi
+    unset d
+}
+
+gscrub()
+{
+    local arg
+    for arg in "$@"
+    do
+        case "$arg" in
+            -h|--help)
+                echo 'Usage: gscrub [-ifnq] [-e <pattern>]' >&2
+                echo 'Scrubs the current git repository without mercy!' >&2
+                echo "Parameters are passed to 'git clean' unmodified" >&2
+                echo "Note that '-f' is already included, adding it a second time will wipe lower-level repos (deps)" >&2
+                return 1
+            ;;
+        esac
+    done
+    if [[ ! -d '.git' ]]
+    then
+        echo "gscrub: error: not at the top of a git repo" >&2
+        return 2
+    fi
+    unset REPLY
+    printf 'Are you SURE you want to remove all untracked files under\n\t%s?\n' "$(pwd)"
+    while read -p '[y/n]: '
+    do
+        case "$REPLY" in
+            [yY]|[yY][eE][sS])
+                break
+                ;;
+            [nN]|[nN][oO])
+                return 0
+                echo 'when you change your mind, use:'
+                echo "$GIT clean -fdqx -e /env -e /env.local -e /.idea/ -e '*.iml' -e '/*.txt'" "$@"
+                ;;
+        esac
+    done
+    $GIT clean -fdqx -e /env -e /env.local -e /.idea/ -e '*.iml' -e '/*.txt' "$@"
+}
+
+gti()
+{
+    if [[ $# -ne 1 ]]
+    then
+        echo 'Usage: gti <exactly-one-tag>' >&2
+        return 1
+    fi
+    local ref
+    local ret
+    local tmp
+    ref="$($GIT rev-parse "$1")"
+    ret=$?
+    if [[ $ret -eq 0 ]]
+    then
+        tmp="$(mktemp '/tmp/gt.XXXXXXX')"
+        $GIT cat-file -p "$ref" >> "$tmp"
+        ref="$(awk '/^tagger[[:space:]]/ {print $(NF-1), $(NF)}' "$tmp")"
+        # BSD and GNU versions of 'date' use different options, try both
+        ref="$(date -jf '%s' "${ref%% *}" '+%Y-%m-%d %H:%M:%S' 2>/dev/null \
+            || date "--date=@${ref%% *}" '+%Y-%m-%d %H:%M:%S') ${ref##* }"
+        printf '%s\t%s\n' "$1" "$ref"
+        cat "$tmp"
+        rm "$tmp"
+    fi
+    return $ret
+}
+
+gy()
+{
+    if [[ $# -ne 1 ]]
+    then
+        echo 'Usage: gy <exactly-one-file-path>' >&2
+        return 1
+    fi
+    local cwd="$(pwd)"
+    cd "$(dirname "$1")" && \
+    $GIT log '--date=format:%Y' '--format=%ad' '--' "$(basename "$1")" \
+    | sort -u
+    cd "$cwd"
+}
+
+_git_help()
+{
+    env_ss_head 'Git'
+    env_ss_show g               'git'
+    env_ss_show ga              'git add'
+    env_ss_show gaa             'git add -A'
+    env_ss_show gb              'git branch'
+    env_ss_show gci             'git commit'
+    env_ss_show gcl             'git clone'
+    env_ss_show gco             'git checkout'
+    env_ss_show gd              'git diff'
+    env_ss_show gds             'git describe'
+    env_ss_show giga            'edit active gitignore'
+    env_ss_show gigg            'edit global gitignore'
+    env_ss_show gl              'git log'
+    env_ss_show glr             'git log recent'
+    env_ss_show gpull           'git pull'
+    env_ss_show gpush           'git push'
+    env_ss_show gr              'git remote'
+    env_ss_show gs              'git status'
+    env_ss_show gscrub          'scrub the current git repository without mercy!'
+    env_ss_show gt              'git tag'
+    env_ss_show gti             '<tag>   list info about one tag'
+    env_ss_show gy              '<path>  list commit years of one file'
+    [[ "$(typeof st)" == undefined ]] || \
+        env_ss_show st          '<dirs>  open <dirs> in SourceTree'
+}
+__sh_ss_funs+=' _git_help'

@@ -1,11 +1,13 @@
-#!/usr/bin/false This file is meant to be sourced
+#!/usr/bin/false 'This file is meant to be sourced'
+# shellcheck disable=SC2096 # shebangs can only specify a single parameter
+[[ -z "$__sh_interactive_sourced" ]] || return 0
 # ========================================================================
-# Copyright (c) 2013-2018 T. R. Burghart.
-# 
+# Copyright (c) 1994-2024 T. R. Burghart.
+#
 # Permission to use, copy, modify, and/or distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
 # copyright notice and this permission notice appear in all copies.
-# 
+#
 # THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
 # WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
 # MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
@@ -15,32 +17,304 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 # ========================================================================
 #
-# Set up interactive shell behavior.
-# Alias some common commands that are builtins in some shells.
-# When updating, it's worth also looking at <repo>/etc/sh.common
+# .profile/.shrc fragment for Bourne-ish shells
 #
+# Sets up interactive shell options and history.
+#
+# Assumptions about the shell per ./sh.shell
+#
+# Refer to https://github.com/tburghart/local_env
+#
+# Install to $HOME/etc/shell/sh.interactive
+#
+[[ -n "$__sh_user_sourced" ]] || . $HOME/etc/shell/sh.user
 
-# what shell are we using?
-# start with shells that may be emulating others
-if [ -n "$ZSH_VERSION" ]
+__sh_export='HISTFILE'
+__sh_unset='__sh_export __sh_unset __sh_suff'
+
+__sh_host="$(hostname -s | tr '[A-Z]' '[a-z]')"
+if [[ $EUID -eq 0 ]]
 then
-    [[ -o interactive ]] || return
-    alias whereis='whence -a'
-    alias which='whence -p'
-
-elif [ -n "$BASH_VERSION" ]
-then
-    [[ -n "$PS1" || -n "$__sh_interactive" || "$-" == *i* ]] || return
-    shopt -s checkwinsize
-    shopt -s cmdhist
-    alias whence='type'
-    alias whereis='type -a'
-    alias which='type -p'
-
-elif [ -n "$KSH_VERSION" ]
-then
-    [[ -n "$PS1" || -n "$__sh_interactive" ]] || return
-    alias whereis='whence -a'
-    alias which='whence -p'
-
+    __sh_suff='$'
+else
+    __sh_suff='#'
 fi
+# don't assume shells handle C-style escapes in double-quoted strings!
+__sh_suff="
+$__sh_suff "
+
+# shell-specific options and functions
+case "$__sh_sh" in
+    bash)
+        # bash specific
+        set -o vi
+        shopt -s checkwinsize
+        shopt -s cmdhist
+        shopt -s histappend
+        alias whence='type'
+        alias whereis='type -a'
+        alias which='type -p'
+        HISTCONTROL='erasedups'
+        HISTFILE="$HOME/.sh_history"
+        HISTFILESIZE=2048
+        HISTSIZE=1024
+        PS1="B \\t ${LOGNAME}@${__sh_host} \$PWD rc:\$?${__sh_suff}"
+        __sh_export='HISTCONTROL HISTFILE HISTFILESIZE HISTSIZE'
+        switch_history()
+        {
+            if [[ $# -ne 1 ]]
+            then
+                echo 'usage: switch_history <to-history-file>' >&2
+                return 1
+            fi
+            local old="$HISTFILE"
+            local new="$1"
+            if ! [[ "$old" -ef "$new" ]]
+            then
+                history -a "$old"
+                [[ -f "$new" ]] || touch "$new"
+                history -r "$new"
+                export HISTFILE="$new"
+            fi
+        }
+        typeof()
+        {
+            if [[ $# -ne 1 ]]
+            then
+                echo 'usage: typeof <name>' >&2
+                return 1
+            fi
+            local t="$(type -t "$1")"
+            [[ -n "$t" ]] || t=undefined
+            echo $t
+        }
+        ;;
+    ksh)
+        # ksh specific
+        set -o vi
+        alias whereis='whence -a'
+        alias which='whence -p'
+        HISTEDIT="$EDITOR"
+        HISTFILE="$HOME/.sh_history"
+        HISTSIZE=1024
+        # this will be replaced later with specific terminal support, if available
+        precmd()
+        {
+            return 0
+        }
+        # ksh don't know nuthin' 'bout dates
+        __sh_date=$($__sh_which date)
+        __sh_unset+=' __sh_date'
+        PS1="K \$(precmd ; $__sh_date '+%H:%M:%S') ${LOGNAME}@${__sh_host} \$PWD rc:\$?${__sh_suff}"
+        __sh_export='HISTEDIT HISTFILE HISTSIZE'
+        switch_history()
+        {
+            if [[ $# -ne 1 ]]
+            then
+                echo 'usage: switch_history <to-history-file>' >&2
+                return 1
+            fi
+            local old="$HISTFILE"
+            local new="$1"
+            if ! [[ "$old" -ef "$new" ]]
+            then
+                # ksh doesn't have any means to flush/reload history, all we
+                # can do is swap the file path
+                [[ -f "$new" ]] || touch "$new"
+                export HISTFILE="$new"
+            fi
+        }
+        typeof()
+        {
+            if [[ $# -ne 1 ]]
+            then
+                echo 'usage: typeof <name>' >&2
+                return 1
+            fi
+            t="$(whence -v "$1" 2>/dev/null)"
+            case "$t" in
+                *\ tracked\ alias\ *)
+                    echo file
+                    ;;
+                *\ alias\ *)
+                    echo alias
+                    ;;
+                *\ builtin)
+                    echo builtin
+                    ;;
+                *\ function)
+                    echo function
+                    ;;
+                *\ keyword)
+                    echo keyword
+                    ;;
+                '')
+                    echo undefined
+                    ;;
+                *)
+                    echo file
+                    ;;
+            esac
+            unset t
+        }
+        ;;
+    zsh)
+        # zsh specific
+        set -o append_history
+        set -o hist_ignore_all_dups
+        set -o hist_reduce_blanks
+        set -o hist_save_no_dups
+        set -o inc_append_history
+        set -o vi
+        bindkey -v
+        bindkey -M vicmd 'k' vi-up-line-or-history
+        bindkey -M vicmd 'j' vi-down-line-or-history
+        alias whereis='whence -a'
+        alias which='whence -p'
+        HISTFILE="$HOME/.sh_history"
+        HISTSIZE=1024
+        SAVEHIST=2048
+        PS1="Z %D{%H:%M:%S} ${LOGNAME}@${__sh_host} %d rc:%?${__sh_suff}"
+        __sh_export='HISTFILE HISTSIZE SAVEHIST'
+        switch_history()
+        {
+            if [[ $# -ne 1 ]]
+            then
+                echo 'usage: switch_history <to-history-file>' >&2
+                return 1
+            fi
+            local old="$HISTFILE"
+            local new="$1"
+            if ! [[ "$old" -ef "$new" ]]
+            then
+                fc -A "$old"
+                [[ -f "$new" ]] || touch "$new"
+                fc -R "$new"
+                export HISTFILE="$new"
+            fi
+        }
+        typeof()
+        {
+            if [[ $# -ne 1 ]]
+            then
+                echo 'usage: typeof <name>' >&2
+                return 1
+            fi
+            local t="$(whence -v "$1")"
+            case "$t" in
+                *\ not\ found)
+                    echo undefined
+                    ;;
+                *\ alias\ *)
+                    echo alias
+                    ;;
+                *\ builtin)
+                    echo builtin
+                    ;;
+                *\ function)
+                    echo function
+                    ;;
+                *\ reserved\ word)
+                    echo keyword
+                    ;;
+                *)
+                    echo file
+                    ;;
+            esac
+        }
+        ;;
+    *)
+        # assume something vaguely Bourne-ish
+        set -o vi
+        FCEDIT="$EDITOR"
+        HISTFILE="$HOME/.sh_history"
+        HISTSIZE=1024
+        # even this may be too much, but try it
+        PS1="S ${LOGNAME}@${__sh_host} \$PWD rc:\$?${__sh_suff}"
+        __sh_export='FCEDIT HISTFILE HISTSIZE'
+        switch_history()
+        {
+            if [ $# -ne 1 ]
+            then
+                echo 'usage: switch_history <to-history-file>' >&2
+                return 1
+            fi
+            old="$HISTFILE"
+            new="$1"
+            if ! [ "$old" -ef "$new" ]
+            then
+                # sh doesn't have any means to flush/reload history, all we
+                # can do is swap the file path
+                [ -f "$new" ] || touch "$new"
+                export HISTFILE="$new"
+            fi
+        }
+        typeof()
+        {
+            if [ $# -ne 1 ]
+            then
+                echo 'usage: typeof <name>' >&2
+                return 1
+            fi
+            t="$(type "$1" 2>/dev/null 1| head -1)"
+            case "$t" in
+                '')
+                    echo undefined
+                    ;;
+                *\ aliased\ *)
+                    echo alias
+                    ;;
+                *\ builtin)
+                    echo builtin
+                    ;;
+                *\ function)
+                    echo function
+                    ;;
+                *\ reserved\ word)
+                    echo keyword
+                    ;;
+                *)
+                    echo file
+                    ;;
+            esac
+            unset t
+        }
+        ;;
+esac
+
+# rudimentary help
+# The 's' ('ss') moniker has been around long enough that I don't remember
+# what it stands for, but it's prevalent through a bunch of code so I don't
+# want to change it.
+
+# s/ss format
+env_ss_format_format="    %%-%us %%s\\\\n"
+env_ss_length_default=15
+env_ss_format_default="$(printf "$env_ss_format_format" $env_ss_length_default)"
+env_ss_format="$env_ss_format_default"
+
+# env_ss_show <command-group>
+env_ss_head()
+{
+    printf "$env_ss_format" "$1" commands
+}
+
+# env_ss_show <command-name> <command-description>
+env_ss_show()
+{
+    printf "$env_ss_format" "$1" "$2"
+}
+
+__sh_ss_funs=''
+
+s()
+{
+    for f in $__sh_ss_funs ; do $f ; echo ; done
+    unset f
+}
+
+# shellcheck disable=SC2163
+export  $__sh_export
+unset   $__sh_unset
+
+__sh_interactive_sourced=true

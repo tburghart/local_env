@@ -1,0 +1,174 @@
+#!/usr/bin/false 'This file is meant to be sourced'
+# shellcheck disable=SC2096 # shebangs can only specify a single parameter
+[[ -z "$__sh_system_sourced" ]] || return 0
+# ========================================================================
+# Copyright (c) 1994-2024 T. R. Burghart.
+#
+# Permission to use, copy, modify, and/or distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+# ========================================================================
+#
+# .profile/.shrc fragment for Bourne-ish shells
+#
+# Figures out some basics about the system.
+# Defines:
+#   $__sh_sys => the output of `uname -s`
+#   $__sh_arch => the output of `uname -m`
+#   $__sh_gui => non-empty if something other than X11
+#   $EUID => effective user id
+#   $UID => real user id
+#   $HOSTNAME => output of system `hostname` command
+#   $PATH => ordered existing system directories
+#
+# Assumptions about the shell per ./sh.shell
+#
+# Refer to https://github.com/tburghart/local_env
+#
+# Install to $HOME/etc/shell/sh.system
+#
+[[ -n "$__sh_shell_sourced" ]] || . $HOME/etc/shell/sh.shell
+
+__sh_export='PATH'
+__sh_unset='__sh_export __sh_unset'
+
+__sh_bin='/bin'
+__sh_sbin='/sbin'
+__sh_usr_bin='/usr/bin'
+__sh_usr_sbin='/usr/sbin'
+__sh_lcl_bin='/usr/local/bin'
+__sh_lcl_sbin='/usr/local/sbin'
+__sh_unset+=' __sh_bin __sh_usr_bin __sh_sbin __sh_usr_sbin __sh_lcl_bin __sh_lcl_sbin'
+
+if [[ /bin -ef /usr/bin ]]
+then
+    if [[ -L /bin ]]
+    then
+        unset __sh_bin
+    elif [[ -L /usr/bin ]]
+    then
+        unset __sh_usr_bin
+    fi
+fi
+if [[ /sbin -ef /usr/sbin ]]
+then
+    if [[ -L /sbin ]]
+    then
+        unset __sh_sbin
+    elif [[ -L /usr/sbin ]]
+    then
+        unset __sh_usr_sbin
+    fi
+fi
+[[ -d "$__sh_lcl_bin" ]] || unset __sh_lcl_bin
+[[ -d "$__sh_lcl_sbin" ]] || unset __sh_lcl_sbin
+
+__sh_core_path="$__sh_usr_bin $__sh_bin $__sh_usr_sbin $__sh_sbin"
+__sh_unset+=' __sh_core_path __sh_d __sh_x'
+unset __sh_sys_id __sh_sys_tr
+for __sh_d in $__sh_core_path
+do
+    __sh_x="$__sh_d/id"
+    if [[ -f "$__sh_x" && -x "$__sh_x" ]]
+    then
+        __sh_sys_id="$__sh_x"
+        break
+    fi
+done
+for __sh_d in $__sh_core_path
+do
+    __sh_x="$__sh_d/tr"
+    if [[ -f "$__sh_x" && -x "$__sh_x" ]]
+    then
+        __sh_sys_tr="$__sh_x"
+        break
+    fi
+done
+[[ -n "$__sh_sys_id" ]] || __sh_sys_id='id'
+[[ -n "$__sh_sys_tr" ]] || __sh_sys_tr='tr'
+__sh_unset+=' __sh_sys_id __sh_sys_tr'
+
+if [[ -z "$EUID" ]]
+then
+    EUID=$($__sh_sys_id -u)
+    __sh_export+=' EUID'
+fi
+if [[ -z "$UID" ]]
+then
+    UID=$($__sh_sys_id -ru)
+    __sh_export+=' UID'
+fi
+
+__sh_core_path="$__sh_lcl_bin $__sh_usr_bin $__sh_bin $__sh_lcl_sbin $__sh_usr_sbin $__sh_sbin"
+# shellcheck disable=SC2086
+__sh_core_path="$(echo $__sh_core_path | $__sh_sys_tr ' ' ':')"
+__sh_save_path="$PATH"
+__sh_unset+=' __sh_save_path'
+PATH="$__sh_core_path"
+export PATH
+hash -r
+
+# shellcheck disable=SC2154
+__sh_sys_hostname=$($__sh_which hostname)
+__sh_sys_uname=$($__sh_which uname)
+__sh_unset+=' __sh_sys_hostname __sh_sys_uname'
+
+__sh_sys=$($__sh_sys_uname -s)
+__sh_arch=$($__sh_sys_uname -m)
+HOSTNAME=$($__sh_sys_hostname)
+__sh_export+=' HOSTNAME'
+
+case "$__sh_sys" in
+    Darwin)
+        case "$(sw_vers -productName)" in
+            macOS|Mac\ OS\ X)
+                __sh_gui=macOS
+                ;;
+        esac
+        if [[ $__sh_sh == bash ]]
+        then
+            BASH_SILENCE_DEPRECATION_WARNING=1
+            __sh_export+=' BASH_SILENCE_DEPRECATION_WARNING'
+        fi
+        ;;
+    SunOS)
+        # Likely widely out of date and should just be removed, really more
+        # of a platform template at this point.
+        __sh_s=''
+        for __sh_d in /usr/gnu/bin /usr/gnu/sbin \
+            /usr/xpg6/bin /usr/xpg6/sbin /usr/xpg4/bin /usr/xpg4/sbin /usr/ucb
+        do
+            [[ ":${PATH}:" != *:${__sh_d}:* ]] || continue
+            [[ ":${__sh_s}:" != *:${__sh_d}:* ]] || continue
+            [[ -d "$__sh_d" ]] || continue
+            __sh_s+="${__sh_d}:"
+        done
+        [[ -z "$__sh_s" ]] || PATH="${__sh_s}${PATH}"
+        ;;
+esac
+__sh_unset+=' __sh_s'
+
+__sh_s="$IFS"
+IFS=':'
+for __sh_d in $__sh_save_path
+do
+    [[ ":${PATH}:" != *:${__sh_d}:* ]] || continue
+    [[ -d "$__sh_d" ]] || continue
+    PATH+=":${__sh_d}"
+done
+IFS="$__sh_s"
+
+# shellcheck disable=SC2163
+export  $__sh_export
+unset   $__sh_unset
+
+__sh_system_sourced=true
+hash -r

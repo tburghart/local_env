@@ -1,11 +1,12 @@
-#!/usr/bin/false This file is meant to be sourced
+#!/usr/bin/false 'This file is meant to be sourced'
+# shellcheck disable=SC2096 # shebangs can only specify a single parameter
 # ========================================================================
-# Copyright (c) 1994-2018 T. R. Burghart.
-# 
+# Copyright (c) 1994-2024 T. R. Burghart.
+#
 # Permission to use, copy, modify, and/or distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
 # copyright notice and this permission notice appear in all copies.
-# 
+#
 # THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
 # WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
 # MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
@@ -22,279 +23,46 @@
 # Install to $HOME/.profile
 #
 
-shome="$HOME"
-stype="$(uname -s)"
-mtype="$(uname -m)"
-usern="${LOGNAME:-${USER:-$(id -un)}}"
-if [[ -n "$__sh_sh" ]]
-then
-    shell="$__sh_sh"
-else
-    shell="${0#-}"
-    shell="${shell##*/}"
-    if [[ "$shell" != *sh && -n "$SHELL" ]]
-    then
-        shell="${SHELL##*/}"
-    fi
-fi
-unset_vars='shell shome stype mtype usern'
+. "$HOME/etc/shell/sh.shell"
+. "$HOME/etc/shell/sh.system"
+. "$HOME/etc/shell/sh.user"
 
-# Hopefully we'll pick this up from /etc/profile having been sourced.
-if [ -z "$__sh_which" ]
-then
-    #
-    # Order shell tests to check for those that may be emulating others before
-    # checking for those that may be emulated by them.
-    #
-    if [[ -n "$ZSH_VERSION" ]]
-    then
-        __sh_which='whence -p'
-    elif [[ -n "$BASH_VERSION" ]]
-    then
-        __sh_which='type -P'
-    elif [[ -n "$KSH_VERSION" ]]
-    then
-        __sh_which='whence -p'
-    #
-    # See if we're in a shell that has a suitable builtin to use as 'which'.
-    # Use 'mkdir' as our test target, since it's almost certainly an actual
-    # executable file on the $PATH.
-    #
-    elif whence -p mkdir 1>/dev/null 2>&1 \
-        && [ `whence -p mkdir 2>&1` = */mkdir ]
-    then
-        __sh_which='whence -p'
-    elif type -P mkdir 1>/dev/null 2>&1 \
-        && [ `type -P mkdir 2>&1` = */mkdir ]
-    then
-        __sh_which='type -P'
-    else
-        __sh_which='which'
-    fi
-fi
+#. "/Users/ted/prj/tedb/local_env/home/etc/shell/sh.shell"
+#. "/Users/ted/prj/tedb/local_env/home/etc/shell/sh.system"
+#. "/Users/ted/prj/tedb/local_env/home/etc/shell/sh.user"
 
-otp_check='/opt/erlang /opt/local /usr/local/erlang /usr/local'
-unset_vars="$unset_vars otp_check"
-
-if [[ -d "$HOME/prj/wday" ]]
-then
-    WDAY_PRJ_BASE="$HOME/prj/wday"
-    export WDAY_PRJ_BASE
-    otp_check+=" $WDAY_PRJ_BASE/local"
-fi
-if [[ -d "$HOME/prj/r3r" ]]
-then
-    R3R_PRJ_BASE="$HOME/prj/r3r"
-    export R3R_PRJ_BASE
-fi
-if [[ -d "$HOME/prj/basho" ]]
-then
-    BASHO_PRJ_BASE="$HOME/prj/basho"
-    export BASHO_PRJ_BASE
-    otp_check+=" $BASHO_PRJ_BASE/local"
-fi
-if [[ -d "$HOME/prj/tedb" ]]
-then
-    TRB_PRJ_BASE="$HOME/prj/tedb"
-    export TRB_PRJ_BASE
-    otp_check+=" $TRB_PRJ_BASE/local"
-
-    if [[ -d "$TRB_PRJ_BASE/local_env" ]]
-    then
-        ledir="$TRB_PRJ_BASE/local_env"
-        unset_vars="$unset_vars ledir"
-        LOCAL_ENV_DIR="$ledir/env"
-        export LOCAL_ENV_DIR
-    fi
-fi
-
-for LOCAL_OTP_DIR in $otp_check $HOME/local
-do
-    [[ ! -d "$LOCAL_OTP_DIR" || ! -w "$LOCAL_OTP_DIR" ]] || break
-done
-export LOCAL_OTP_DIR
-
-pathbeg="$ledir /usr/local /opt/local"
-pathadd=''
-if [[ "$stype" == 'SunOS' ]]
-then
-    pathbeg="$pathbeg /usr/gnu /usr/xpg6 /usr/xpg4"
-    pathadd="$pathadd /usr/ucb"
-fi
-pathbeg="$pathbeg /usr /opt"
-pathend='/usr/local/cuda /usr/local/mysql'
-bpath=''
-spath=''
-unset_vars="$unset_vars pathbeg pathend pathadd bpath spath"
-
-if [[ "$stype" == 'Darwin' && "$(sw_vers -productName)" == 'Mac OS X' ]]
-then
-    gui='OSX'
-    if [[ -d "$HOME/bin/OsX" ]]
-    then
-        bpath="${bpath:+${bpath}:}$HOME/bin/OsX"
-    fi
-    if [[ -d "${HOME}/sbin/OsX" ]]
-    then
-        spath="${spath:+${spath}:}$HOME/sbin/OsX"
-    fi
-else
-    pathend="/usr/X11R7 /usr/X11R6 $pathend"
-    pathadd="$pathadd /usr/bin/X11R7 /usr/bin/X11R6 /usr/bin/X11"
-fi
-unset_vars="$unset_vars gui"
-
-for d in "/$stype/$mtype" "/$stype" ''
-do
-    if [[ -d "$HOME/bin${d}" ]]
-    then
-        bpath="${bpath:+${bpath}:}${HOME}/bin${d}"
-    fi
-    if [[ -d "$HOME/sbin${d}" ]]
-    then
-        spath="${spath:+${spath}:}${HOME}/sbin${d}"
-    fi
-done
-unset_vars="$unset_vars d"
-
-for d in $pathbeg ${PATH//:/ } / $pathend
-do
-    case "$d" in
-        / )
-            b='/bin'
-            s='/sbin'
-            ;;
-        */bin )
-            b="$d"
-            s=''
-            ;;
-        */sbin )
-            b=''
-            s="$d"
-            ;;
-        * )
-            b="$d/bin"
-            s="$d/sbin"
-            ;;
-    esac
-    if [[ -n "$b" && -d "$b" ]] && ! [[ "$bpath" =~ ^(.*:)?$b(:.*)?$ ]]
-    then
-        bpath="${bpath:+${bpath}:}$b"
-    fi
-    if [[ -n "$s" && -d "$s" ]] && ! [[ "$spath" =~ ^(.*:)?$s(:.*)?$ ]]
-    then
-        spath="${spath:+${spath}:}$s"
-    fi
-done
-unset_vars="$unset_vars b s"
+#set | /usr/bin/grep -E '^[[:alnum:]_]+=' | /usr/bin/sort -u
+#exit
 
 #
-# handle explicit paths
+# The environment is set up, what happens next?
 #
-for d in $pathadd
-do
-    if [[ -d "$d" ]] && ! [[ "$bpath" =~ ^(.*:)?$d(:.*)?$ ]]
-    then
-        bpath="${bpath:+${bpath}:}$d"
-    fi
-done
+__sh_profile_export=''
+__sh_profile_unset='__sh_profile_export __sh_profile_unset'
+unset __sh_profile_next
 
-PATH="$bpath:$spath"
-export PATH
-
-[[ -n "$LANG" ]] || LANG='C'
-if [[ -z "$ECP" ]]
-then
-    if [[ "$stype" == 'Darwin' ]]
-    then
-        ECP='/bin/cp -pX'
-    else
-        ECP='/bin/cp -p'
-    fi
-fi
-[[ -n "$EGREP" ]] || EGREP="$($__sh_which grep 2>/dev/null || echo grep) -E"
-[[ -n "$ESED" ]] || ESED="$($__sh_which sed 2>/dev/null || echo sed) -E"
-[[ -n "$GIT" ]] || GIT="$($__sh_which git 2>/dev/null || echo git)"
-if [[ -z "$MAKE" ]]
-then
-    case "$stype" in
-        Darwin|Linux)
-            MAKE="$($__sh_which /usr/bin/make 2>/dev/null \
-                || $__sh_which make 2>/dev/null \
-                || $__sh_which gmake 2>/dev/null || echo make)"
-            ;;
-        *)
-            MAKE="$($__sh_which gmake 2>/dev/null \
-                || $__sh_which make 2>/dev/null || echo gmake)"
-            ;;
-    esac
-fi
-[[ -n "$REBAR" ]] || \
-    REBAR="$($__sh_which /usr/local/bin/rebar 2>/dev/null \
-        || $__sh_which rebar 2>/dev/null || echo rebar)"
-[[ -n "$REBAR3" ]] || \
-    REBAR3="$($__sh_which /usr/local/bin/rebar3 2>/dev/null \
-        || $__sh_which rebar3 2>/dev/null || echo rebar3)"
-export ECP EGREP ESED GIT LANG MAKE REBAR REBAR3
-
-BLOCKSIZE=1024
-for EDITOR in $($__sh_which vi 2>/dev/null) \
-    $($__sh_which vim 2>/dev/null) $($__sh_which nano 2>/dev/null) vi
-do
-    break
-done
-for PAGER in $($__sh_which less 2>/dev/null) \
-    $($__sh_which more 2>/dev/null) more
-do
-    break
-done
-export BLOCKSIZE EDITOR PAGER
-
-if [[ -n "$SSH_TTY" ]]
-then
-    MATE="$($__sh_which rmate 2>/dev/null)"
-else
-    MATE="$($__sh_which mate 2>/dev/null)"
-fi
-if [[ -n "$MATE" ]]
-then
-    export MATE
-    [[ -n "$VISUAL" ]] || VISUAL="$MATE --wait"
-else
-    unset MATE
-    if [[ -z "$VISUAL" ]]
-    then
-        VISUAL="$($__sh_which tedit 2>/dev/null)"
-        [[ -n "$VISUAL" ]] || VISUAL="$EDITOR"
-    fi
-fi
-P4EDITOR="$VISUAL"
-WINEDITOR="$VISUAL"
-export VISUAL P4EDITOR WINEDITOR
-
-case "$shell" in
+case "$__sh_sh" in
     bash)
         # bash stupidly doesn't source its rc files from an interactive login shell
-        if [[ "$-" = *i* || -n "$__sh_interactive" || -n "$PS1" ]]
+        if [[ -n "$__sh_login" && -n "$__sh_interactive" ]]
         then
-            for f in "$HOME/.bashrc" "$HOME/.shrc"
+            __sh_profile_unset+=' __sh_f'
+            for __sh_f in "$HOME/.bashrc" "$HOME/.shrc"
             do
-                if [[ -f "$f" ]]
+                if [[ -f "$__sh_f" ]]
                 then
-                    if [[ "$f" != "$HOME/.bashrc" ]]
+                    if [[ "$__sh_f" != "$HOME/.bashrc" ]]
                     then
-                        echo Warning: '***' non-standard environment file $f \
-                            will not be sourced by interactive bash \
+                        echo Warning: '***' non-standard environment file \
+                            $__sh_f will not be sourced by interactive bash \
                             subshells, consider installing as $HOME/.bashrc
                     fi
-                    . "$f"
+                    __sh_profile_next="$__sh_f"
                     break
                 fi
             done
-            unset_vars="$unset_vars f ENV"
-        else
-            unset_vars="$unset_vars ENV"
         fi
+        __sh_profile_unset+=' ENV'
         ;;
     ksh)
         if [[ -z "$ENV" || "$ENV" = "$HOME/.kshrc" || ! -f "$ENV" ]]
@@ -302,9 +70,9 @@ case "$shell" in
             if [[ ! -f "$HOME/.kshrc" && -f "$HOME/.shrc" ]]
             then
                 ENV="$HOME/.shrc"
-                export ENV
+                __sh_profile_export+=' ENV'
             else
-                unset_vars="$unset_vars ENV"
+                __sh_profile_unset+=' ENV'
             fi
         fi
         ;;
@@ -314,9 +82,9 @@ case "$shell" in
             if [[ -f "$HOME/.shrc" ]]
             then
                 ENV="$HOME/.shrc"
-                export ENV
+                __sh_profile_export+=' ENV'
             else
-                unset_vars="$unset_vars ENV"
+                __sh_profile_unset+=' ENV'
             fi
         fi
         ;;
@@ -326,13 +94,20 @@ case "$shell" in
             echo Warning: '***' non-standard environment file $HOME/.shrc \
                 will not be sourced by interactive zsh subshells, consider \
                 installing as $HOME/.zshrc
-            . "$HOME/.shrc"
+            __sh_profile_next="$HOME/.shrc"
         fi
-        unset_vars="$unset_vars ENV"
+        __sh_profile_unset+=' ENV'
         ;;
     *)
-        unset_vars="$unset_vars ENV"
+        __sh_profile_unset+=' ENV'
         ;;
 esac
 
-unset $unset_vars unset_vars 2>/dev/null
+# shellcheck disable=SC2163
+[[ -z "$__sh_profile_export" ]] || export $__sh_profile_export
+unset $__sh_profile_unset
+if [[ -n "$__sh_profile_next" ]]
+then
+    . "$__sh_profile_next"
+    unset __sh_profile_next
+fi

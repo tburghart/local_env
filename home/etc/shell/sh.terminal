@@ -1,11 +1,13 @@
-#!/usr/bin/false This file is meant to be sourced
+#!/usr/bin/false 'This file is meant to be sourced'
+# shellcheck disable=SC2096 # shebangs can only specify a single parameter
+[[ -z "$__sh_terminal_sourced" ]] || return 0
 # ========================================================================
-# Copyright (c) 2013-2016 T. R. Burghart.
-# 
+# Copyright (c) 1994-2024 T. R. Burghart.
+#
 # Permission to use, copy, modify, and/or distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
 # copyright notice and this permission notice appear in all copies.
-# 
+#
 # THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
 # WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
 # MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
@@ -15,177 +17,122 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 # ========================================================================
 #
-# maybe tell the terminal program where we are
+# .profile/.shrc fragment for Bourne-ish shells
 #
+# Maybe tell the terminal program where we are
+#
+# Assumptions about the shell per ./sh.shell
+#
+# Refer to https://github.com/tburghart/local_env
+#
+# Install to $HOME/etc/shell/sh.terminal
+#
+[[ -n "$__sh_interactive_sourced" ]] || . "$HOME/etc/shell/sh.interactive"
 
-if [ -n "$ZSH_VERSION" ]
-then
-    [[ -o interactive ]] || return
-    shell=zsh
-    func=true
+# We return out of the file in some non-continuable cases, so mark the file
+# as sourced up front.
+__sh_terminal_sourced=true
 
-elif [ -n "$BASH_VERSION" ]
-then
-    [[ -n "$PS1" || -n "$__sh_interactive" || "$-" == *i* ]] || return
-    shell=bash
-    func=true
-
-elif [ -n "$KSH_VERSION" ]
-then
-    [[ -n "$PS1" || -n "$__sh_interactive" ]] || return
-    shell=ksh
-    func=true
-
-else    # assume some Bourne variant
-    [ -n "$PS1" -o -n "$__sh_interactive" ] || return
-    shell=sh
-    func=''
-fi
+unset __sh_term_prog
 
 #
-# If there are multiple users with the same uid, `id` will report the first
-# one it finds, which may not be the name used to log in. With luck, `login`
-# set the actual name used in the environment.
+# If it's a terminal that we can *maybe* tell about where we are, define a
+# function to do so.
 #
-host="$(/bin/hostname | /usr/bin/cut -d. -f1)"
-user="${LOGNAME:-${USER:-$(/usr/bin/id -un)}}"
-
-if [ $(/usr/bin/id -u) -eq 0 ]
-then
-    suff='#'
-else
-    suff='$'
-fi
-# don't assume shells handle C-style escapes in double-quoted strings!
-suff="
-$suff "
-
-if [ -n "$func" ]
-then
-    case "$TERM_PROGRAM" in
-        Apple_Terminal)
-            termp='apple'
-            ;;
-        iTerm.app)
-            termp='iterm'
-            ;;
-        xterm|rxvt|gnome-terminal)
-            termp='xterm'
-            ;;
-        *)
-            termp=''
-            pid=$$
-            while true
-            do
-                # let echo strip leading/trailing whitespace
-                pid="$(echo $(ps -o ppid -p $pid 2>/dev/null | tail -1))"
-                [[ "$pid" == [0-9]* && "$pid" -gt 1 ]] || break
-                # if we work it out, set TERM_PROGRAM so subshells skip this
-                str="$(echo $(ps -o comm -p $pid 2>/dev/null | tail -1))"
-                case "$str" in
-                    */Terminal.app/*/MacOS/*)
-                        TERM_PROGRAM='Apple_Terminal'
-                        export TERM_PROGRAM
-                        termp='apple'
-                        break
-                        ;;
-                    */MacOS/iTerm*)
-                        TERM_PROGRAM='iTerm.app'
-                        export TERM_PROGRAM
-                        termp='iterm'
-                        break
-                        ;;
-                    xterm|rxvt|gnome-terminal)
-                        TERM_PROGRAM="$str"
-                        export TERM_PROGRAM
-                        termp='xterm'
-                        break
-                        ;;
-                    sshd|[\(\[]*)
-                        # some system daemon, nothing to be found above here
-                        break
-                        ;;
-                esac
-            done
-            unset pid str
-            ;;
-    esac
-    case "$termp" in
-        apple)
-            # clear the Apple default if it's set
-            unset -f update_terminal_cwd 2>/dev/null || true
-            eval "precmd()
-            {
-                printf "\'\\e]7\;file://$HOSTNAME%s\\a\'" \"\$PWD\"
-                printf "\'\\e]0\;$user@$host %s\\a\'" \"\${PWD/#\${HOME}/~}\"
-            }"
-            # " un-choke editor syntax highlighting
-            ;;
-        iterm)
-            eval "precmd()
-            {
-                printf "\'\\e]1337\;RemoteHost=$user@$host\\a\'"
-                printf "\'\\e]1337\;CurrentDir=%s\\a\'" \"\$PWD\"
-                printf "\'\\e]0\;$user@$host %s\\a\'" \"\${PWD/#\${HOME}/~}\"
-            }"
-            # " un-choke editor syntax highlighting
-            ;;
-        xterm)
-            eval "precmd()
-            {
-                printf "\'\\e]0\;$user@$host %s\\a\'" \"\${PWD/#\${HOME}/~}\"
-            }"
-            # " un-choke editor syntax highlighting
-            ;;
-        *)
-            if [[ "$TERM" != xterm* ]]
-            then
-                # if it's not xterm-ish don't even try
-                func=''
-            else
-                # throw everything in and hope the terminal doesn't barf
-                eval "precmd()
-                {
-                    printf "\'\\e]1337\;RemoteHost=$user@$host\\a\'"
-                    printf "\'\\e]1337\;CurrentDir=%s\\a\'" \"\$PWD\"
-                    printf "\'\\e]7\;file://$HOSTNAME%s\\a\'" \"\$PWD\"
-                    printf "\'\\e]0\;$user@$host %s\\a\'" \"\${PWD/#\${HOME}/~}\"
-                }"
-                # " un-choke editor syntax highlighting
-            fi
-            ;;
-    esac
-fi
-
-case "$shell" in
-    bash)
-        if [[ -n "$func" ]]
-        then
-            PROMPT_COMMAND='precmd'
-            export PROMPT_COMMAND
-        fi
-        PS1="B \\t $user@$host \$PWD rc:\$?$suff"
+case "$TERM_PROGRAM" in
+    Apple_Terminal)
+        __sh_term_prog='apple'
         ;;
-    ksh)
-        for date in /bin/date /usr/bin/date date
-        do
-            [[ ! -f "$date" ]] || break
-        done
-        if [[ -n "$func" ]]
-        then
-            PS1="K \$(precmd)\$($date '+%H:%M:%S') $user@$host \$PWD rc:\$?$suff"
-        else
-            PS1="K \$($date '+%H:%M:%S') $user@$host \$PWD rc:\$?$suff"
-        fi
-        unset date
+    iTerm.app)
+        __sh_term_prog='iterm'
         ;;
-    zsh)
-        PS1="Z %D{%H:%M:%S} $user@$host %d rc:%?$suff"
+    xterm|rxvt|gnome-terminal)
+        __sh_term_prog='xterm'
         ;;
     *)
-        PS1="S $user@$host \$PWD rc:\$?$suff"
+        pid=$$
+        while true
+        do
+            # let echo strip leading/trailing whitespace
+            pid="$(echo $(ps -o ppid -p $pid 2>/dev/null | tail -1))"
+            [[ "$pid" == [0-9]* && "$pid" -gt 1 ]] || break
+            # if we work it out, set TERM_PROGRAM so subshells skip this
+            str="$(echo $(ps -o comm -p $pid 2>/dev/null | tail -1))"
+            case "$str" in
+                */Terminal.app/*/MacOS/*)
+                    TERM_PROGRAM='Apple_Terminal'
+                    export TERM_PROGRAM
+                    __sh_term_prog='apple'
+                    break
+                    ;;
+                */MacOS/iTerm*)
+                    TERM_PROGRAM='iTerm.app'
+                    export TERM_PROGRAM
+                    __sh_term_prog='iterm'
+                    break
+                    ;;
+                xterm|rxvt|gnome-terminal)
+                    TERM_PROGRAM="$str"
+                    export TERM_PROGRAM
+                    __sh_term_prog='xterm'
+                    break
+                    ;;
+                sshd|[\(\[]*)
+                    # some system daemon, nothing to be found above here
+                    break
+                    ;;
+            esac
+        done
+        unset pid str
         ;;
 esac
-export PS1
 
-unset func host shell suff termp user
+case "$__sh_term_prog" in
+    apple)
+        # clear the Apple default if it's set
+        unset -f update_terminal_cwd 2>/dev/null || true
+        precmd()
+        {
+            printf '\e]0;%s@%s %s\a' "$LOGNAME" "$__sh_host" "$PWD"
+        }
+        ;;
+    iterm)
+        precmd()
+        {
+            printf '\e]1337;RemoteHost=%s@%s\a' "$LOGNAME" "$__sh_host"
+            printf '\e]1337;CurrentDir=%s\a' "$PWD"
+            printf '\e]0;%s@%s %s\e\' "$LOGNAME" "$__sh_host" "$PWD"
+        }
+        ;;
+    xterm)
+        precmd()
+        {
+            printf '\e]0;%s@%s %s\a' "$LOGNAME" "$__sh_host" "$PWD"
+        }
+        ;;
+    *)
+        if [[ "$TERM" != xterm* ]]
+        then
+            # if it's not xterm-ish don't even try
+            return 0
+        else
+            # throw everything in and hope the terminal doesn't barf
+            precmd()
+            {
+                printf '\e]1337;RemoteHost=%s@%s\a' "$LOGNAME" "$__sh_host"
+                printf '\e]1337;CurrentDir=%s\a' "$PWD"
+                printf '\e]7;file://%s%s\a' "$__sh_host" "$PWD"
+                printf '\e]0;%s@%s %s\a' "$LOGNAME" "$__sh_host" "$PWD"
+            }
+        fi
+        ;;
+esac
+
+# If we got here, function precmd() is defined to something that will *try* to
+# feed info to the terminal.
+
+unset __sh_term_prog
+
+# We build invocation of precmd() into out ksh prompt, and zsh recognizes it
+# directly, so bash is the only one needing more action.
+[[ "$__sh_sh" != bash ]] || PROMPT_COMMAND='precmd'

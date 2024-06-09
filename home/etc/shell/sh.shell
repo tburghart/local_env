@@ -1,0 +1,146 @@
+#!/usr/bin/false 'This file is meant to be sourced'
+# shellcheck disable=SC2096 # shebangs can only specify a single parameter
+[[ -z "$__sh_shell_sourced" ]] || return 0
+# ========================================================================
+# Copyright (c) 1994-2024 T. R. Burghart.
+#
+# Permission to use, copy, modify, and/or distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+# ========================================================================
+#
+# .profile/.shrc fragment for Bourne-ish shells
+#
+# Figures out the shell and its basic functionality
+# Defines:
+#   $__sh_sh => the lowercase name of the shell
+#   $__sh_interactive => non-empty in an interactive shell
+#   $__sh_login => non-empty in a login shell
+#   $__sh_which => command functioning like `whence -p`
+# Also ensures that the exported $SHELL environment variable is set to
+# something sane.
+#
+# Assumptions about the shell:
+#   - Supports `[[ ... ]]`
+#   - Supports `$(command ...)`
+#   - Supports `${var#...}` and `${var%...}`
+#   - Command `hash -r` clears the executable lookup table
+#
+# This is the first file to be sourced along any entry path, and all
+# subsequent files assume the $__sh_xxx variables listed above are
+# defined/undefined as documented.
+#
+# Refer to https://github.com/tburghart/local_env
+#
+# Install to $HOME/etc/shell/sh.shell
+#
+
+# identify the shell and some features
+# - start with shells that may be emulating others
+# - $PS1 isn't always a reliable test for an interactive shell, so
+#   if the shell has a distinct test, use it
+# ToDo: This needs to identify more-featured shells running in POSIX mode
+if [[ -n "$ZSH_VERSION" ]]
+then
+    # Cause field splitting to be performed on unquoted parameter expansions,
+    # like all other shells.
+    setopt SH_WORD_SPLIT
+    __sh_sh=zsh
+    __sh_which='whence -p'
+    if [[ -o interactive ]]
+    then
+        __sh_interactive=true
+    else
+        unset __sh_interactive
+    fi
+    if [[ -o login ]]
+    then
+        __sh_login=true
+    else
+        unset __sh_login
+    fi
+elif [[ -n "$BASH_VERSION" ]]
+then
+    __sh_sh=bash
+    __sh_which='type -P'
+    case "$-" in
+        *i*)  __sh_interactive=true   ;;
+        *)    unset __sh_interactive  ;;
+    esac
+    if shopt -q login_shell
+    then
+        __sh_login=true
+    else
+        unset __sh_login
+    fi
+elif [[ -n "$KSH_VERSION" ]]
+then
+    __sh_sh=ksh
+    __sh_which='whence -p'
+    if [[ -n "$PS1" ]]
+    then
+        __sh_interactive=true
+    else
+        unset __sh_interactive
+    fi
+    case "$0" in
+        -*) __sh_login=true   ;;
+        *)  unset __sh_login  ;;
+    esac
+else
+    __sh_sh='sh'
+    # See if we're in a shell that has a suitable builtin to use as
+    # 'which', using 'mkdir' as our test target since it's almost
+    # certainly an actual executable file on the $PATH.
+    if whence -p mkdir 1>/dev/null 2>&1 \
+        && [[ $(whence -p mkdir 2>&1) = */mkdir ]]
+    then
+        __sh_which='whence -p'
+    elif type -P mkdir 1>/dev/null 2>&1 \
+        && [[ $(type -P mkdir 2>&1) = */mkdir ]]
+    then
+        __sh_which='type -P'
+    else
+        __sh_which='which'
+    fi
+    if [[ -n "$PS1" ]]
+    then
+        __sh_interactive=true
+    else
+        unset __sh_interactive
+    fi
+    case "$0" in
+        -*) __sh_login=true   ;;
+        *)  unset __sh_login  ;;
+    esac
+fi
+
+# see if we can ensure that $SHELL is set to something sane
+if [[ -z "$SHELL" || ! -f "$SHELL" ]]
+then
+    __prf_fn="${SHELL##*/}"
+    if [[ "$__prf_fn" != "$__sh_sh" && "$__prf_fn" != "r$__sh_sh" ]]
+    then
+        for __prf_sh in /bin/$__sh_sh /usr/bin/$__sh_sh $($__sh_which $__sh_sh 2>/dev/null)
+        do
+            if [[ -f "$__prf_sh" && -x "$__prf_sh" ]]
+            then
+                SHELL="$__prf_sh"
+                export SHELL
+                break
+            fi
+        done
+        unset __prf_sh
+    fi
+    unset __prf_fn
+fi
+
+__sh_shell_sourced=true

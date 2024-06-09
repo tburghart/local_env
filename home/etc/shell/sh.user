@@ -1,0 +1,194 @@
+#!/usr/bin/false 'This file is meant to be sourced'
+# shellcheck disable=SC2096 # shebangs can only specify a single parameter
+[[ -z "$__sh_user_sourced" ]] || return 0
+# ========================================================================
+# Copyright (c) 1994-2024 T. R. Burghart.
+#
+# Permission to use, copy, modify, and/or distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+# ========================================================================
+#
+# .profile/.shrc fragment for Bourne-ish shells
+#
+# Populates much of the user-specific environment
+#
+# Assumptions about the shell per ./sh.shell
+#
+# Refer to https://github.com/tburghart/local_env
+#
+# Install to $HOME/etc/shell/sh.user
+#
+[[ -n "$__sh_system_sourced" ]] || . $HOME/etc/shell/sh.system
+
+#
+# file permissions: rwxr-xr-x
+#
+umask   022
+
+[[ -n "$LOGNAME" ]] || LOGNAME="$(id -un)"
+[[ -n "$USER" ]] || USER="$LOGNAME"
+
+__sh_export='LOGNAME PATH USER'
+__sh_unset='__sh_export __sh_unset'
+
+if [[ -d "$HOME/prj/tedb" ]]
+then
+    TRB_PRJ_BASE="$HOME/prj/tedb"
+    __sh_export+=' TRB_PRJ_BASE'
+
+    if [[ -d "$TRB_PRJ_BASE/local_env" ]]
+    then
+        __sh_ledir="$TRB_PRJ_BASE/local_env"
+        __sh_unset+=' __sh_ledir'
+        LOCAL_ENV_DIR="$__sh_ledir/env"
+        __sh_export+=' LOCAL_ENV_DIR'
+    fi
+fi
+if [[ -d "$HOME/prj/basho" ]]
+then
+    BASHO_PRJ_BASE="$HOME/prj/basho"
+    __sh_export+=' BASHO_PRJ_BASE'
+fi
+if [[ -d "$HOME/prj/r3r" ]]
+then
+    R3R_PRJ_BASE="$HOME/prj/r3r"
+    __sh_export+=' R3R_PRJ_BASE'
+fi
+if [[ -d "$HOME/prj/wday" ]]
+then
+    WDAY_PRJ_BASE="$HOME/prj/wday"
+    __sh_export+=' WDAY_PRJ_BASE'
+fi
+
+for __sh_d in /opt/erlang /opt/local/erlang /usr/local/erlang
+do
+    if [[ -d "$__sh_d" && -w "$__sh_d" ]]
+    then
+        LOCAL_OTP_DIR="$__sh_d"
+        __sh_export+=' LOCAL_OTP_DIR'
+        break
+    fi
+done
+__sh_unset+=' __sh_d __sh_path_add __sh_path_dirs'
+
+#
+# set up the user PATH
+#
+__sh_path_dirs=''
+[[ -z "$__sh_gui" ]] || \
+    __sh_path_dirs+=" $HOME/$__sh_sys/$__sh_arch/$__sh_gui/bin $HOME/$__sh_sys/$__sh_gui/bin $HOME/$__sh_gui/bin"
+__sh_path_dirs+=" $HOME/$__sh_sys/$__sh_arch/bin $HOME/$__sh_arch/bin $HOME/$__sh_sys/bin $HOME/bin"
+
+__sh_path_add=''
+for __sh_d in $__sh_path_dirs
+do
+    [[ ":${PATH}:" != *:${__sh_d}:* ]] || continue
+    [[ ":${__sh_path_add}:" != *:${__sh_d}:* ]] || continue
+    [[ -d "$__sh_d" ]] || continue
+    __sh_path_add+="${__sh_d}:"
+done
+PATH="${__sh_path_add}${PATH}"
+
+__sh_path_dirs=''
+[[ -z "$__sh_ledir" ]] || __sh_path_dirs+=" $__sh_ledir/bin"
+__sh_path_dirs+=' /opt/local/bin /opt/local/sbin /opt/X11/bin'
+__sh_path_dirs+=' /usr/local/cuda/bin /usr/local/cuda/sbin'
+__sh_path_dirs+=' /usr/local/mysql/bin /usr/local/mysql/sbin'
+__sh_path_dirs+=' /usr/X11R7/bin /usr/X11R6/sbin'
+__sh_path_dirs+=' /usr/bin/X11R7 /usr/bin/X11R6 /usr/bin/X11'
+
+__sh_path_add=''
+for __sh_d in $__sh_path_dirs
+do
+    [[ ":${PATH}:" != *:${__sh_d}:* ]] || continue
+    [[ ":${__sh_path_add}:" != *:${__sh_d}:* ]] || continue
+    [[ -d "$__sh_d" ]] || continue
+    __sh_path_add+=":${__sh_d}"
+done
+PATH+="${__sh_path_add}"
+#
+# PATH is complete
+#
+
+[[ -n "$LANG" ]] || LANG='C'
+if [[ -z "$ECP" ]]
+then
+    if [[ "$__sh_sys" == Darwin ]]
+    then
+        ECP='/bin/cp -pX'
+    else
+        ECP='/bin/cp -p'
+    fi
+fi
+[[ -n "$GREP" ]]    || GREP="$($__sh_which grep 2>/dev/null || echo grep)"
+[[ -n "$SED" ]]     || SED="$($__sh_which sed 2>/dev/null || echo sed)"
+[[ -n "$DATE" ]]    || DATE="$($__sh_which date 2>/dev/null || echo date)"
+[[ -n "$EGREP" ]]   || EGREP="$GREP -E"
+[[ -n "$ESED" ]]    || ESED="$SED -E"
+[[ -n "$GIT" ]]     || GIT="$($__sh_which git 2>/dev/null || echo git)"
+if [[ -z "$MAKE" ]]
+then
+    case "$__sh_sys" in
+        Darwin|Linux)
+            MAKE="$($__sh_which /usr/bin/make 2>/dev/null \
+                || $__sh_which make 2>/dev/null \
+                || $__sh_which gmake 2>/dev/null || echo make)"
+            ;;
+        *)
+            MAKE="$($__sh_which gmake 2>/dev/null \
+                || $__sh_which make 2>/dev/null || echo gmake)"
+            ;;
+    esac
+fi
+__sh_export+=' DATE ECP EGREP ESED GIT GREP LANG MAKE SED'
+
+BLOCKSIZE=1024
+for EDITOR in $($__sh_which vi 2>/dev/null) \
+    $($__sh_which vim 2>/dev/null) $($__sh_which nano 2>/dev/null) vi
+do
+    break
+done
+for PAGER in $($__sh_which less 2>/dev/null) \
+    $($__sh_which more 2>/dev/null) more
+do
+    break
+done
+__sh_export+=' BLOCKSIZE EDITOR PAGER'
+
+if [[ -n "$SSH_TTY" ]]
+then
+    MATE='/usr/local/bin/rmate'
+else
+    MATE='/usr/local/bin/mate'
+fi
+if [[ -f "$MATE" ]]
+then
+    __sh_export+=' MATE'
+    [[ -n "$VISUAL" ]] || VISUAL="$MATE --wait"
+else
+    __sh_unset+=' MATE'
+    if [[ -z "$VISUAL" ]]
+    then
+        VISUAL="$($__sh_which tedit 2>/dev/null)"
+        [[ -n "$VISUAL" ]] || VISUAL="$EDITOR"
+    fi
+fi
+P4EDITOR="$VISUAL"
+WINEDITOR="$VISUAL"
+__sh_export+=' VISUAL P4EDITOR WINEDITOR'
+
+# shellcheck disable=SC2163
+export  $__sh_export
+unset   $__sh_unset
+
+__sh_user_sourced=true
+hash -r
